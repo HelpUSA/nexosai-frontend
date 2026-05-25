@@ -1,151 +1,66 @@
-// NexosAI Dashboard - Connected to Railway watcher-api
-// Version: 0.2.0-download
+// NexosAI Landing Page - Animated background with Google login
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://watcher-api-production-56ad.up.railway.app";
-const GITHUB_RELEASE = "/download";
-
-async function getStatus() {
- try {
- const res = await fetch(`${API_BASE}/health`, { next: { revalidate: 30 } });
- return await res.json();
- } catch {
- return { ok: false, service: "offline" };
- }
-}
-
-async function getDocs() {
- try {
- const res = await fetch(`${API_BASE}/db-query`, {
- method: "POST",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({
- sql: "SELECT heading_text, content_md FROM memory.document_sections ORDER BY order_index LIMIT 6",
- }),
- next: { revalidate: 60 },
- });
- const data = await res.json();
- return data.db_query?.rows || [];
- } catch {
- return [];
- }
-}
-
-async function getGitLog() {
- try {
- const res = await fetch(`${API_BASE}/git-op`, {
- method: "POST",
- headers: { "Content-Type": "application/json" },
- body: JSON.stringify({ operation: "log", args: ["5"] }),
- next: { revalidate: 60 },
- });
- const data = await res.json();
- return data.git_op?.result || [];
- } catch {
- return [];
- }
-}
-
-export default async function Dashboard() {
- const status = await getStatus();
- const docs = await getDocs();
- const gitLog = await getGitLog();
-
+export default function LandingPage() {
  return (
- <main className="min-h-screen bg-[#0a0a0a] text-[#e0e0e0] p-6 font-mono">
- {/* Header */}
- <header className="flex justify-between items-center mb-8 border-b border-[#1a1a2e] pb-4">
- <div>
- <h1 className="text-2xl font-bold text-[#6c63ff]">NexosAI</h1>
- <p className="text-sm text-gray-500">Dashboard v0.2.0</p>
+ <main className="relative h-screen w-screen overflow-hidden bg-[#0a0a0a]">
+ {/* Animated Background */}
+ <div className="absolute inset-0">
+ <div className="absolute top-0 -left-40 w-96 h-96 bg-[#6c63ff] rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse" />
+ <div className="absolute top-1/2 -right-40 w-96 h-96 bg-[#00ff88] rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse" style={{animationDelay: '1s'}} />
+ <div className="absolute -bottom-40 left-1/3 w-96 h-96 bg-[#6c63ff] rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse" style={{animationDelay: '2s'}} />
  </div>
- <div className="flex items-center gap-4">
- <a href="/download" target="_blank" className="px-4 py-2 bg-[#6c63ff] text-white rounded-lg text-sm hover:bg-[#5a52d5] transition">
- ⬇ Download Installer
- </a>
- <span className={`px-3 py-1 rounded text-sm ${status.ok ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}>
- {status.ok ? '🟢 Online' : '🔴 Offline'}
- </span>
- </div>
- </header>
 
- {/* Download Section */}
- <section className="bg-gradient-to-r from-[#1a1a2e] to-[#2a1a4e] p-6 rounded-lg border border-[#6c63ff] mb-8">
- <div className="flex items-center gap-4">
- <div className="text-4xl">💻</div>
- <div className="flex-1">
- <h2 className="text-xl font-bold text-[#6c63ff]">Get NexosAI for Windows</h2>
- <p className="text-sm text-gray-400 mt-1">Professional installer with wizard. Sets up the complete AI Bridge environment in one click.</p>
+ {/* Grid Background */}
+ <div className="absolute inset-0 opacity-10" style={{
+ backgroundImage: 'linear-gradient(#6c63ff 1px, transparent 1px), linear-gradient(90deg, #6c63ff 1px, transparent 1px)',
+ backgroundSize: '60px 60px'
+ }} />
+
+ {/* Content */}
+ <div className="relative z-10 flex flex-col items-center justify-center h-full text-center px-6">
+ {/* Logo */}
+ <div className="mb-6 w-20 h-20 rounded-2xl bg-gradient-to-br from-[#6c63ff] to-[#00ff88] flex items-center justify-center shadow-2xl shadow-[#6c63ff]/30 animate-float">
+ <span className="text-3xl font-bold text-white">N</span>
  </div>
+
+ {/* Title */}
+ <h1 className="text-5xl md:text-7xl font-bold text-white mb-4 tracking-tight">
+ Nexos<span className="text-[#6c63ff]">AI</span>
+ </h1>
+ 
+ {/* Subtitle */}
+ <p className="text-lg md:text-xl text-gray-300 mb-2 max-w-xl">
+ AI Bridge — Local AI Orchestration Platform
+ </p>
+ <p className="text-sm text-gray-500 mb-8 max-w-md">
+ Connect ChatGPT and DeepSeek to your local machine. Automate workflows, manage chats, and orchestrate AI agents.
+ </p>
+
+ {/* Google Login Button */}
  <a
- href={`/NexosAI_Setup.exe`}
- className="px-6 py-3 bg-[#00ff88] text-black font-bold rounded-lg hover:bg-[#00cc6a] transition text-sm"
+ href="/api/auth/signin"
+ className="group flex items-center gap-3 px-8 py-4 bg-white text-gray-900 rounded-xl font-semibold text-lg hover:bg-gray-100 transition-all shadow-2xl hover:shadow-[#6c63ff]/30 hover:scale-105"
  >
- ⬇ Download .exe
+ <svg className="w-5 h-5" viewBox="0 0 24 24">
+ <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+ <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+ <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+ <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+ </svg>
+ Continue with Google
  </a>
- </div>
- <div className="mt-4 text-xs text-gray-500">
- Requirements: Windows 10/11 • Python 3.11+ • Git • Node.js 20+ • Chrome
- </div>
- </section>
-
- {/* Status Cards */}
- <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
- <div className="bg-[#1a1a2e] p-4 rounded-lg border border-[#2a2a4e]">
- <h3 className="text-sm text-gray-400 mb-2">Watcher API</h3>
- <p className="text-lg">{status.service || "N/A"}</p>
- <p className="text-xs text-gray-500">{status.version || ""}</p>
- </div>
- <div className="bg-[#1a1a2e] p-4 rounded-lg border border-[#2a2a4e]">
- <h3 className="text-sm text-gray-400 mb-2">Database</h3>
- <p className="text-lg">{status.database?.database || "N/A"}</p>
- <p className="text-xs text-gray-500">{status.database?.now || ""}</p>
- </div>
- <div className="bg-[#1a1a2e] p-4 rounded-lg border border-[#2a2a4e]">
- <h3 className="text-sm text-gray-400 mb-2">Cloud Actions</h3>
- <p className="text-lg">4 ativas</p>
- <p className="text-xs text-gray-500">git-op | db-query | codex | file-ops</p>
- </div>
- </section>
-
- <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
- {/* Documentation */}
- <section className="bg-[#1a1a2e] p-4 rounded-lg border border-[#2a2a4e]">
- <h2 className="text-lg font-bold text-[#6c63ff] mb-4">📚 Documentação</h2>
- {docs.length > 0 ? (
- <ul className="space-y-3">
- {docs.map((doc: any, i: number) => (
- <li key={i} className="border-b border-[#2a2a4e] pb-2">
- <h4 className="text-sm font-semibold text-[#00ff88]">{doc.heading_text}</h4>
- <p className="text-xs text-gray-400 mt-1">{doc.content_md?.slice(0, 120)}...</p>
- </li>
- ))}
- </ul>
- ) : (
- <p className="text-sm text-gray-500">Carregando documentação...</p>
- )}
- </section>
-
- {/* Git Log */}
- <section className="bg-[#1a1a2e] p-4 rounded-lg border border-[#2a2a4e]">
- <h2 className="text-lg font-bold text-[#6c63ff] mb-4">🔧 Git Log</h2>
- {Array.isArray(gitLog) && gitLog.length > 0 ? (
- <ul className="space-y-2">
- {gitLog.slice(0, 5).map((log: string, i: number) => (
- <li key={i} className="text-xs text-gray-400 border-b border-[#2a2a4e] pb-1">
- {log}
- </li>
- ))}
- </ul>
- ) : (
- <p className="text-sm text-gray-500">Carregando git log...</p>
- )}
- </section>
- </div>
 
  {/* Footer */}
- <footer className="mt-8 pt-4 border-t border-[#1a1a2e] text-xs text-gray-600 text-center">
- NexosAI • {API_BASE} • {new Date().getFullYear()}
- </footer>
+ <p className="mt-8 text-sm text-gray-600">
+ Secure • Encrypted • Local-first
+ </p>
+ <p className="mt-2 text-xs text-gray-700">
+ By continuing, you agree to the Terms of Service and Privacy Policy.
+ </p>
+ </div>
+
+ {/* Bottom Bar */}
+ <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#6c63ff] via-[#00ff88] to-[#6c63ff]" />
  </main>
  );
 }
