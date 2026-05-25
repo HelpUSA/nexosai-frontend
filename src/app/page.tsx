@@ -1,7 +1,8 @@
 // NexosAI Dashboard - Connected to Railway watcher-api
-// Version: 0.1.0-dashboard
+// Version: 0.2.0-download
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://watcher-api-production-56ad.up.railway.app";
+const GITHUB_RELEASE = "https://github.com/HelpUSA/ai-bridge/releases/tag/v1.0.0-installer";
 
 async function getStatus() {
  try {
@@ -55,14 +56,37 @@ export default async function Dashboard() {
  <header className="flex justify-between items-center mb-8 border-b border-[#1a1a2e] pb-4">
  <div>
  <h1 className="text-2xl font-bold text-[#6c63ff]">NexosAI</h1>
- <p className="text-sm text-gray-500">Dashboard v0.1.0</p>
+ <p className="text-sm text-gray-500">Dashboard v0.2.0</p>
  </div>
  <div className="flex items-center gap-4">
+ <a href={GITHUB_RELEASE} target="_blank" className="px-4 py-2 bg-[#6c63ff] text-white rounded-lg text-sm hover:bg-[#5a52d5] transition">
+ ⬇ Download Installer
+ </a>
  <span className={`px-3 py-1 rounded text-sm ${status.ok ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}>
  {status.ok ? '🟢 Online' : '🔴 Offline'}
  </span>
  </div>
  </header>
+
+ {/* Download Section */}
+ <section className="bg-gradient-to-r from-[#1a1a2e] to-[#2a1a4e] p-6 rounded-lg border border-[#6c63ff] mb-8">
+ <div className="flex items-center gap-4">
+ <div className="text-4xl">💻</div>
+ <div className="flex-1">
+ <h2 className="text-xl font-bold text-[#6c63ff]">Get NexosAI for Windows</h2>
+ <p className="text-sm text-gray-400 mt-1">Professional installer with wizard. Sets up the complete AI Bridge environment in one click.</p>
+ </div>
+ <a
+ href={`${GITHUB_RELEASE}/download/NexosAI_Setup.exe`}
+ className="px-6 py-3 bg-[#00ff88] text-black font-bold rounded-lg hover:bg-[#00cc6a] transition text-sm"
+ >
+ ⬇ Download .exe
+ </a>
+ </div>
+ <div className="mt-4 text-xs text-gray-500">
+ Requirements: Windows 10/11 • Python 3.11+ • Git • Node.js 20+ • Chrome
+ </div>
+ </section>
 
  {/* Status Cards */}
  <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
