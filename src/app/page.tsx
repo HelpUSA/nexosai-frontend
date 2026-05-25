@@ -2,7 +2,7 @@
 // Version: 0.2.0-download
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://watcher-api-production-56ad.up.railway.app";
-const GITHUB_RELEASE = "https://github.com/HelpUSA/ai-bridge/releases/tag/v1.0.0-installer";
+const GITHUB_RELEASE = "/download";
 
 async function getStatus() {
  try {
