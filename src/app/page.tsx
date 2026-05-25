@@ -59,7 +59,7 @@ export default async function Dashboard() {
  <p className="text-sm text-gray-500">Dashboard v0.2.0</p>
  </div>
  <div className="flex items-center gap-4">
- <a href={GITHUB_RELEASE} target="_blank" className="px-4 py-2 bg-[#6c63ff] text-white rounded-lg text-sm hover:bg-[#5a52d5] transition">
+ <a href="/download" target="_blank" className="px-4 py-2 bg-[#6c63ff] text-white rounded-lg text-sm hover:bg-[#5a52d5] transition">
  ⬇ Download Installer
  </a>
  <span className={`px-3 py-1 rounded text-sm ${status.ok ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}>
@@ -77,7 +77,7 @@ export default async function Dashboard() {
  <p className="text-sm text-gray-400 mt-1">Professional installer with wizard. Sets up the complete AI Bridge environment in one click.</p>
  </div>
  <a
- href={`${GITHUB_RELEASE}/download/NexosAI_Setup.exe`}
+ href={`/NexosAI_Setup.exe`}
  className="px-6 py-3 bg-[#00ff88] text-black font-bold rounded-lg hover:bg-[#00cc6a] transition text-sm"
  >
  ⬇ Download .exe
