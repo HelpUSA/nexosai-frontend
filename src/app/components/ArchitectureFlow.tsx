@@ -22,7 +22,7 @@ export default function ArchitectureFlow() {
  if (data.db_query?.rows) {
  setMessages(data.db_query.rows);
  const chats: string[] = [...new Set(data.db_query.rows.flatMap((m: any) => [m.source_chat_id, m.target_chat_id]).filter(Boolean))];
- setActiveChats(chats.slice(0, 6));
+ setActiveChats(chats.slice(0, 6) as string[]);
  }
  } catch (e) {}
  };
