@@ -21,7 +21,7 @@ export default function ArchitectureFlow() {
  const data = await res.json();
  if (data.db_query?.rows) {
  setMessages(data.db_query.rows);
- const chats = [...new Set(data.db_query.rows.flatMap((m: any) => [m.source_chat_id, m.target_chat_id]).filter(Boolean))];
+ const chats: string[] = [...new Set(data.db_query.rows.flatMap((m: any) => [m.source_chat_id, m.target_chat_id]).filter(Boolean))];
  setActiveChats(chats.slice(0, 6));
  }
  } catch (e) {}
@@ -34,7 +34,7 @@ export default function ArchitectureFlow() {
  // Generate animated flow items
  useEffect(() => {
  if (activeChats.length === 0) return;
- const items: any[] = [];
+ const items: {id: string, chatId: string, progress: number, delay: number}[] = [];
  activeChats.forEach((chatId, i) => {
  const shortId = chatId.slice(0, 8);
  items.push({
