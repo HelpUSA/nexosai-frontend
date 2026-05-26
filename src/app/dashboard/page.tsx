@@ -1,4 +1,6 @@
-// NexosAI Dashboard - Post-login with Mode Toggle
+// NexosAI Dashboard - Post-login with Architecture Flow
+
+import ArchitectureFlow from "@/app/components/ArchitectureFlow";
 
 export default function DashboardPage() {
  return (
@@ -7,13 +9,16 @@ export default function DashboardPage() {
  <div className="flex justify-between items-center mb-8">
  <div>
  <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
- <p className="text-gray-400">Welcome back! Control your AI Bridge.</p>
+ <p className="text-gray-400">Welcome back! Your AI Bridge is running.</p>
  </div>
  <div className="flex gap-3">
  <a href="/download" className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm hover:bg-white/20 transition">⬇ Installer</a>
  <a href="/api/auth/signout" className="px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-sm hover:bg-red-500/30 transition">Sign Out</a>
  </div>
  </div>
+
+ {/* Architecture Flow - LIVE */}
+ <ArchitectureFlow />
 
  {/* Mode Toggle */}
  <div className="bg-white/5 border border-[#6c63ff]/30 rounded-xl p-6 mb-8">
