@@ -8,18 +8,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
  Google({
  clientId: process.env.GOOGLE_CLIENT_ID || "",
  clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
- authorization: {
- params: {
- prompt: "consent",
- access_type: "offline",
- response_type: "code",
- },
- },
  }),
  ],
  callbacks: {
  async signIn({ user, account, profile }) {
- // Only allow specific email during initial setup
+ // Allow specific emails
  const allowedEmails = ["helpus.ecommerce@gmail.com"];
  if (allowedEmails.includes(user.email || "")) {
  return true;
@@ -27,7 +20,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
  // For now, only allow the admin email
  return user.email === "helpus.ecommerce@gmail.com";
  },
- async jwt({ token, account, profile }) {
+ async jwt({ token, account }) {
  if (account) {
  token.accessToken = account.access_token;
  }
