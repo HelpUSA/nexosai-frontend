@@ -3,8 +3,8 @@ import './globals.css';
 import { LanguagePopdown } from './components/LanguagePopdown';
 
 export const metadata: Metadata = {
-  title: 'NexosAI Cloud — AI Agent Command Center',
-  description: 'NexosAI Cloud Mesh: Secure orchestration for autonomous AI agents and local execution nodes.',
+  title: 'NexosAI Cloud — AI Agent Mesh & Orchestration Platform',
+  description: 'NexosAI Cloud Mesh: Secure enterprise orchestration for autonomous AI agents, multi-LLM routing, and local execution nodes.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -13,23 +13,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <div className='shell'>
           
-          {/* Sidebar Navigation */}
+          {/* Sidebar Navigation with Official HelpUS Logo */}
           <aside className='sidebar'>
             <div>
               <a href='/dashboard' className='brand'>
-                <div className='brandMark'>N</div>
+                <img
+                  src='/helpus_logo.png'
+                  alt='HelpUS Logo'
+                  style={{ height: '48px', width: 'auto', objectFit: 'contain' }}
+                />
                 <div>
-                  <strong>NexosAI</strong>
-                  <span>Cloud Mesh</span>
+                  <strong style={{ fontSize: '1.15rem', color: 'var(--text-dark)' }}>NexosAI</strong>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Cloud Mesh
+                  </span>
                 </div>
               </a>
 
               <nav>
-                <a href='/dashboard' className='active'>
+                <a href='/' className='active'>
+                  🏠 Home / Mesh Overview
+                </a>
+                <a href='/dashboard'>
                   ⚡ Dashboard
                 </a>
                 <a href='/nodes'>
-                  🖥️ Nodes
+                  🖥️ Nodes Mesh
                 </a>
                 <a href='/agents'>
                   🤖 AI Agents
@@ -41,20 +50,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   💬 Conversations & Relays
                 </a>
                 <a href='/downloads'>
-                  📥 Downloads
+                  📥 Downloads & Setup
                 </a>
                 <a href='/audit'>
                   🛡️ Audit Logs
                 </a>
                 <a href='/admin'>
-                  ⚙️ Admin
+                  ⚙️ Admin Settings
                 </a>
               </nav>
             </div>
 
             <div className='sidebarNote'>
-              <strong>HelpUS LLC — Gulf Shores, AL</strong><br />
-              Bootstrap Admin: helpus.ecommerce@gmail.com
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <img src='/helpus_logo.png' alt='HelpUS' style={{ height: '24px', width: 'auto' }} />
+                <strong style={{ fontSize: '0.8rem', color: 'var(--text-dark)' }}>HelpUS LLC</strong>
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Gulf Shores, AL 36542<br />
+                helpus.ecommerce@gmail.com
+              </span>
             </div>
           </aside>
 
@@ -63,13 +78,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             
             {/* Top Header Navbar */}
             <header className='topHeader'>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', background: '#eff6ff', border: '1px solid #bfdbfe', padding: '4px 10px', borderRadius: '8px' }}>
-                  NexosAI Cloud Mesh
-                </span>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  HelpUS Technology Platform
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <img
+                  src='/helpus_logo.png'
+                  alt='HelpUS Logo'
+                  style={{ height: '36px', width: 'auto' }}
+                />
+                <div>
+                  <span style={{ fontSize: '0.85rem', fontWeight: '800', color: 'var(--text-dark)' }}>
+                    NexosAI <span style={{ color: 'var(--primary)' }}>Cloud Mesh</span>
+                  </span>
+                  <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    Alabama Launchpad Cycle 2 2026 • HelpUS LLC
+                  </span>
+                </div>
               </div>
 
               {/* Language Switcher Popdown Menu (Default: EN 🇺🇸) */}
@@ -77,12 +99,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <LanguagePopdown currentLang="en" />
 
                 <a href='https://helpusbr.com' target='_blank' rel='noopener noreferrer' className='buttonSecondary' style={{ fontSize: '0.78rem', padding: '6px 12px' }}>
-                  HelpUS Site ↗
+                  HelpUS Portal ↗
                 </a>
               </div>
             </header>
 
             <main className='main'>{children}</main>
+
+            {/* Clean Footer with Official HelpUS Logo */}
+            <footer style={{ marginTop: 'auto', background: '#ffffff', borderTop: '1px solid var(--border-light)', padding: '24px 32px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <img src='/helpus_logo.png' alt='HelpUS Logo' style={{ height: '36px', width: 'auto' }} />
+                  <div>
+                    <strong style={{ color: 'var(--text-dark)' }}>NexosAI Cloud Mesh</strong> by HelpUS LLC
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>© 2026 HelpUS LLC. 241 E 16th Ave Ste B4, Gulf Shores, AL 36542.</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem' }}>
+                  <a href='/privacy' style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: '600' }}>Privacy Policy</a>
+                  <a href='/status' style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: '600' }}>System Status</a>
+                  <a href='mailto:contato@helpusbr.com' style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: '600' }}>Contact Support</a>
+                </div>
+              </div>
+            </footer>
+
           </div>
 
         </div>
