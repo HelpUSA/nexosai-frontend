@@ -1,0 +1,38 @@
+
+
+/* Accessiblity Related Rules */
+/* These are the rules that should *not* apply if javascript is disabled. */
+
+
+.offstate {
+    display: none !important;
+}
+
+html .wForm form .wfPage, html .wForm form .wfHideSubmit {
+    display: none !important;
+}
+html .wForm form .saveAndResume .actions  .wfHideSubmit {
+    display: block !important;
+}
+html .wForm form .wfCurrentPage {
+    display: block !important;
+}
+
+.offstate-resumelater {
+    display: none !important;
+}
+.onstate-resumelater {
+    display: block !important;
+}
+
+#saveAndResumeFieldset {
+    display: none;
+}
+
+/* Handle page visibility */
+html .wForm form .wfPage, html .wForm form .wfHideSubmit {
+    display: none !important;
+}
+html .wForm form .wfCurrentPage {
+    display: block !important;
+}

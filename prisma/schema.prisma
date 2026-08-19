@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  OWNER
+  OPERATOR
+  VIEWER
+}
+
+enum NodeType {
+  LIGHT
+  FULL
+}
+
+enum NodeStatus {
+  ONLINE
+  IDLE
+  BUSY
+  DEGRADED
+  OFFLINE
+  RETIRED
+}
+
+enum AgentModel {
+  GPT4O
+  GPT4O_MINI
+  DEEPSEEK_R1
+  DEEPSEEK_V3
+  OLLAMA_LOCAL
+  GEMINI_15_PRO
+}
+
+enum ConversationChannel {
+  WEBCHAT
+  WHATSAPP
+  API
+  SYSTEM
+}
+
+enum ConversationStatus {
+  ACTIVE
+  PAUSED
+  RESOLVED
+  ARCHIVED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum LogSeverity {
+  INFO
+  WARN
+  ERROR
+  CRITICAL
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  name          String?
+  image         String?
+  role          UserRole     @default(VIEWER)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  auditLogs     AuditLog[]
+  createdAgents Agent[]
+}
+
+model Organization {
+  id            String         @id @default(cuid())
+  name          String
+  slug          String         @unique
+  createdAt     DateTime       @default(now())
+  nodes         Node[]
+  agents        Agent[]
+  conversations Conversation[]
+  documents     Document[]
+  auditLogs     AuditLog[]
+}
+
+model Node {
+  id              String         @id @default(cuid())
+  organizationId  String
+  name            String
+  type            NodeType       @default(LIGHT)
+  status          NodeStatus     @default(OFFLINE)
+  machineName     String?
+  installPath     String?
+  version         String?
+  gatewayOk       Boolean        @default(false)
+  runtimeReady    Boolean        @default(false)
+  activeChatCount Int            @default(0)
+  lastSeenAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  conversations   Conversation[]
+  auditLogs       AuditLog[]
+}
+
+model Agent {
+  id             String         @id @default(cuid())
+  organizationId String
+  userId         String?
+  name           String
+  description    String?
+  systemPrompt   String         @db.Text
+  model          AgentModel     @default(GPT4O)
+  temperature    Float          @default(0.7)
+  maxTokens      Int            @default(2048)
+  isActive       Boolean        @default(true)
+  avatarUrl      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  conversations  Conversation[]
+}
+
+model Conversation {
+  id             String             @id @default(cuid())
+  organizationId String
+  agentId        String?
+  nodeId         String?
+  title          String
+  channel        ConversationChannel @default(WEBCHAT)
+  externalId     String?            // e.g. WhatsApp phone number or Webchat session token
+  status         ConversationStatus  @default(ACTIVE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agent          Agent?             @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  node           Node?              @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  messages       Message[]
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           MessageRole  @default(USER)
+  content        String       @db.Text
+  tokensUsed     Int?
+  latencyMs      Int?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model Document {
+  id             String      @id @default(cuid())
+  organizationId String
+  title          String
+  fileUrl        String?
+  fileType       String?
+  content        String      @db.Text
+  chunkCount     Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  embeddings     Embedding[]
+}
+
+model Embedding {
+  id         String   @id @default(cuid())
+  documentId String
+  chunkIndex Int
+  content    String   @db.Text
+  vector     String?  @db.Text // Serialized vector embedding array
+  createdAt  DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String?
+  userId         String?
+  nodeId         String?
+  action         String
+  details        String?      @db.Text
+  severity       LogSeverity  @default(INFO)
+  ipAddress      String?
+  createdAt      DateTime     @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  node           Node?        @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+}

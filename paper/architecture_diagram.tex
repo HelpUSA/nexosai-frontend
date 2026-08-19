@@ -1,0 +1,47 @@
+\documentclass{article}
+\usepackage{tiegraphic}
+\usepackage{geography}
+\usepackage{block}
+\usepackage{color}
+
+\begin{document}
+
+\begin{center}
+\text{\big#NexusAI - Secure Orchestration for AI Agents\par\usepackage{bold}Data Flow &amp; Architecture\usepackage{bold}}
+end{center}
+
+\section{Architecture Layers}
+
+The system consists of five main layers:
+
+begin{itemize}
+    \item {\bold{Client Layer}}: Chats (ChatGPT, DeepSeek, Gemini) and API requests. Flow to Gateway.
+}
+    \item {\bold{Gateway Layer |\ Monitoram}; Watcher connects to chats and routes commands to Core.
+}
+    \item {\bold{Core Layer}: Broker server (local API), Orchestrator (fast path) and Agent (OpenAI).
+}
+    \item {\bold{Adapters Layer}: Controlled connectors to files, databases, browsers, scripts, and systems.
+}
+    \item {\bold{Persistence Layer}: Logs, audit trail, backups, and operational memory.
+}
+\end{itemize}
+
+trm    \
+ 
+begin{tiegraphic}[hs],scale=1.0,step=node`_
+    node [client] {Client Layer}
+    node [gateway] {Gateway Layer}
+    node [core] {Core Layer}
+    node [adapters] {Adapters Layer}
+    node [persistence] {Persistence Layer}
+    
+\dyamalclient.� gateway[data/flow];
+    \dyamalhgateway.'`core[command];
+    \dyamal`core.'`jՅѕrs[workflow];
+    \dyamalhcore.'``Dyamalh |end
+{tiegraphic}
+
+\bod{script}
+
+\nend{document}

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NexusAI - Architecture</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 1200px; margin: auto; }
+        h1, h2 { color: #222; }
+        .mermaid { text-align: center; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+        @media print {
+            body { margin: 0; padding: 20px; }
+            .container { max-width: 100%; }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.2.2/mermaid.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>NexusAI - Secure Orchestration for AI Agents</h1>
+    <h2>Data Flow &amp; Architecture</h2>
+    
+    <div class="mermaid">
+        </div>
+    
+    <p><em>Note: This diagram shows the core architecture. For a high-res version, save this page as PDF using 'Print' /> 'Save as PDF'.</em></p>
+    
+    <h3>Textual Description of Architecture</h3>
+    <p>The system consists of five main layers:</p>
+    <ol>
+        <li><strong>Client Layer</strong>: Chats (ChatGPT, DeepSeek, Gemini) and API requests.</li>
+        <li><strong>Gateway Layer</strong>: Watcher connects to chats and routes commands to the Broker and Orchestrator.</li>
+        <li><strong>Core Layer</strong>: Broker server (local API), Orchestrator (fast path) and Agent (OpenAI for reasoning).</li>
+        <li><strong>Adapter Layer</strong>: Controlled connectors to files, databases, browsers, scripts, and systems.</li>
+        <li><strong>Persistence Layer</strong>: Logs, audit trail, backups, and memory storage.</li>
+    </ol>
+    
+</div>
+</body>
+</html>
