@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { LanguagePopdown } from './components/LanguagePopdown';
 
 export const metadata: Metadata = {
-  title: 'NexosAI Cloud — Central de Comando de IA',
-  description: 'NexosAI Cloud Mesh: Orquestração segura de agentes autônomos de IA e nós de execução local.',
+  title: 'NexosAI Cloud — AI Agent Command Center',
+  description: 'NexosAI Cloud Mesh: Secure orchestration for autonomous AI agents and local execution nodes.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang='pt-BR'>
+    <html lang='en'>
       <body>
         <div className='shell'>
           
@@ -28,32 +29,32 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   ⚡ Dashboard
                 </a>
                 <a href='/nodes'>
-                  🖥️ Nós (Nodes)
+                  🖥️ Nodes
                 </a>
                 <a href='/agents'>
-                  🤖 Agentes de IA
+                  🤖 AI Agents
                 </a>
                 <a href='/projects'>
-                  📁 Projetos
+                  📁 Projects
                 </a>
                 <a href='/conversations'>
-                  💬 Conversas & Relays
+                  💬 Conversations & Relays
                 </a>
                 <a href='/downloads'>
                   📥 Downloads
                 </a>
                 <a href='/audit'>
-                  🛡️ Auditoria & Logs
+                  🛡️ Audit Logs
                 </a>
                 <a href='/admin'>
-                  ⚙️ Administração
+                  ⚙️ Admin
                 </a>
               </nav>
             </div>
 
             <div className='sidebarNote'>
               <strong>HelpUS LLC — Gulf Shores, AL</strong><br />
-              Admin Bootstrap: helpus.ecommerce@gmail.com
+              Bootstrap Admin: helpus.ecommerce@gmail.com
             </div>
           </aside>
 
@@ -71,13 +72,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </span>
               </div>
 
-              {/* Native Language Switcher (PT | EN | ES) */}
+              {/* Language Switcher Popdown Menu (Default: EN 🇺🇸) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className='hub-lang-switcher'>
-                  <a href='?lang=pt' className='hub-lang-btn active'>PT</a>
-                  <a href='?lang=en' className='hub-lang-btn'>EN</a>
-                  <a href='?lang=es' className='hub-lang-btn'>ES</a>
-                </div>
+                <LanguagePopdown currentLang="en" />
 
                 <a href='https://helpusbr.com' target='_blank' rel='noopener noreferrer' className='buttonSecondary' style={{ fontSize: '0.78rem', padding: '6px 12px' }}>
                   HelpUS Site ↗
