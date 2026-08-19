@@ -14,8 +14,19 @@ export function LanguagePopdown({ currentLang = 'en' }: LanguagePopdownProps) {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlLang = params.get('lang');
+      const savedLang = localStorage.getItem('nexos_lang');
+
       if (urlLang && ['en', 'es', 'pt'].includes(urlLang)) {
         setSelectedLang(urlLang);
+        localStorage.setItem('nexos_lang', urlLang);
+        document.cookie = `nexos_lang=${urlLang}; path=/; max-age=31536000`;
+      } else if (savedLang && ['en', 'es', 'pt'].includes(savedLang)) {
+        setSelectedLang(savedLang);
+        if (!urlLang) {
+          const url = new URL(window.location.href);
+          url.searchParams.set('lang', savedLang);
+          window.location.replace(url.toString());
+        }
       }
     }
   }, []);
@@ -32,9 +43,13 @@ export function LanguagePopdown({ currentLang = 'en' }: LanguagePopdownProps) {
   const handleSelect = (code: string) => {
     setSelectedLang(code);
     setIsOpen(false);
-    const url = new URL(window.location.href);
-    url.searchParams.set('lang', code);
-    window.location.href = url.toString();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nexos_lang', code);
+      document.cookie = `nexos_lang=${code}; path=/; max-age=31536000`;
+      const url = new URL(window.location.href);
+      url.searchParams.set('lang', code);
+      window.location.href = url.toString();
+    }
   };
 
   return (
