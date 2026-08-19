@@ -1,44 +1,39 @@
-export default function DownloadsPage() {
- return (
- <>
- <section className='hero'>
- <span className='badge'>Downloads</span>
- <h1>Instale a NexosAI em qualquer computador.</h1>
- <p>
- Esta tela sera o ponto de distribuicao do pacote local. O usuario autenticado podera gerar token,
- baixar o instalador e escolher a pasta destino durante a instalacao local.
- </p>
- <div className='actions'>
- <a className='button' href='/downloads'>Gerar token de instalacao</a>
- <a className='buttonSecondary' href='/nodes'>Ver nodes</a>
- </div>
- </section>
+import { translations, getLang } from '@/i18n/translations';
 
- <section className='gridTwo'>
- <article className='card'>
- <h2>Comando planejado</h2>
- <code className='code'>powershell.exe -NoProfile -ExecutionPolicy Bypass -File install-nexosai.ps1</code>
- <p className='muted'>O instalador local perguntara a pasta destino, por exemplo D:\dev\autocode\ai-bridge ou C:\NexosAI\AI-Bridge.</p>
- </article>
- <article className='card'>
- <h2>O que a nuvem guarda</h2>
- <ul className='list'>
- <li>Token de instalacao e usuario que gerou.</li>
- <li>Versao do pacote e changelog.</li>
- <li>Registro do node apos primeira inicializacao.</li>
- <li>Resumo de health e ultimo heartbeat.</li>
- </ul>
- </article>
- </section>
+export default async function DownloadsPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
+  const resolvedParams = await searchParams;
+  const lang = getLang(resolvedParams?.lang);
+  const t = translations[lang] || translations.en;
 
- <section className='card' style={{ marginTop: 18 }}>
- <h2>Seguranca do instalador</h2>
- <ul className='list'>
- <li>Tokens devem expirar e poder ser revogados pelo admin.</li>
- <li>Credenciais locais nao devem ser enviadas para a nuvem.</li>
- <li>A instalacao Full Node registra capacidades, mas execucao permanece local.</li>
- </ul>
- </section>
- </>
- );
+  return (
+    <>
+      <section className='hero'>
+        <span className='badge'>{t.downloads.badge}</span>
+        <h1>{t.downloads.title}</h1>
+        <p>{t.downloads.description}</p>
+      </section>
+
+      <section className='gridTwo'>
+        <article className='card'>
+          <h2>NexosAI Bridge Installer (Full Node)</h2>
+          <p className='muted' style={{ marginBottom: 16 }}>
+            Windows Executable (.exe) setup to install local AI Bridge gateway on 127.0.0.1:8765.
+          </p>
+          <a href='/NexosAI_Setup.exe' className='button' download>
+            📥 Download NexosAI_Setup.exe
+          </a>
+        </article>
+
+        <article className='card'>
+          <h2>Browser Relay Extension (Light Node)</h2>
+          <p className='muted' style={{ marginBottom: 16 }}>
+            Chrome / Edge Extension for discovery and chat relaying across ChatGPT, DeepSeek and Gemini.
+          </p>
+          <button className='buttonSecondary'>
+            🧩 Add to Browser Extension
+          </button>
+        </article>
+      </section>
+    </>
+  );
 }

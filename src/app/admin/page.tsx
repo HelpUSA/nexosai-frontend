@@ -1,50 +1,37 @@
-const adminItems = [
- { label: 'Bootstrap admin', value: 'helpus.ecommerce@gmail.com ' },
- { label: 'Auth provider', value: 'Google login' },
- { label: 'Database target', value: 'Railway PostgreSQL' },
- { label: 'Deploy target', value: 'Vercel' },
-];
+import { translations, getLang } from '@/i18n/translations';
 
-export default function AdminPage() {
- return (
- <>
- <section className='hero'>
- <span className='badge'>Admin</span>
- <h1>Controle global sem amarrar a operacao a um unico servidor.</h1>
- <p>
- O admin gerencia usuarios, organizacoes, tokens, nodes, roles e auditoria. O bootstrap admin deve ser
- definido por variavel de ambiente para evitar hardcode permanente.
- </p>
- </section>
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
+  const resolvedParams = await searchParams;
+  const lang = getLang(resolvedParams?.lang);
+  const t = translations[lang] || translations.en;
 
- <section className='gridTwo'>
- <article className='card'>
- <h2>Configuracao inicial</h2>
- <div className='kv'>
- {adminItems.map((item) => (
- <div key={item.label}><span>{item.label}</span><strong>{item.value}</strong></div>
- ))}
- </div>
- </article>
- <article className='card'>
- <h2>Permissoes planejadas</h2>
- <ul className='list'>
- <li>ADMIN: acesso global, usuarios, tokens e auditoria.</li>
- <li>OWNER: gestao de projetos e nodes autorizados.</li>
- <li>OPERATOR: operacao assistida e leitura operacional.</li>
- <li>VIEWER: leitura de paineis e reports.</li>
- </ul>
- </article>
- </section>
+  return (
+    <>
+      <section className='hero'>
+        <span className='badge'>{t.admin.badge}</span>
+        <h1>{t.admin.title}</h1>
+        <p>{t.admin.description}</p>
+      </section>
 
- <section className='card' style={{ marginTop: 18 }}>
- <h2>Safety defaults</h2>
- <ul className='list'>
- <li>Sem execucao remota arbitraria no MVP.</li>
- <li>Tokens de instalacao revogaveis e com expiracao.</li>
- <li>Auditoria para login, token, node, role lease e mensagem roteada.</li>
- </ul>
- </section>
- </>
- );
+      <section className='gridTwo'>
+        <article className='card'>
+          <h2>Organization Permissions & Roles</h2>
+          <div className='kv'>
+            <div><span>Bootstrap Admin</span><strong>helpus.ecommerce@gmail.com</strong></div>
+            <div><span>Default Role</span><strong>VIEWER</strong></div>
+            <div><span>OAuth Provider</span><strong>Google Auth</strong></div>
+          </div>
+        </article>
+
+        <article className='card'>
+          <h2>API Credentials & Keys</h2>
+          <div className='kv'>
+            <div><span>OpenAI API</span><strong>Configured (GPT-4o)</strong></div>
+            <div><span>DeepSeek API</span><strong>Configured (R1 / V3)</strong></div>
+            <div><span>Local Ollama Bridge</span><strong>127.0.0.1:8765</strong></div>
+          </div>
+        </article>
+      </section>
+    </>
+  );
 }

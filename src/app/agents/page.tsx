@@ -1,6 +1,11 @@
 import { db } from '@/lib/db';
+import { translations, getLang } from '@/i18n/translations';
 
-export default async function AgentsPage() {
+export default async function AgentsPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
+  const resolvedParams = await searchParams;
+  const lang = getLang(resolvedParams?.lang);
+  const t = translations[lang] || translations.en;
+
   // Fetch agents or fallback demo items
   let agents: any[] = [];
   try {
@@ -18,35 +23,32 @@ export default async function AgentsPage() {
     agents = [
       {
         id: 'agent-1',
-        name: 'Atendente de Vendas Nexos',
-        subtitle: 'GPT-4o Omnichannel',
+        name: lang === 'en' ? 'Sales Agent Nexos' : lang === 'es' ? 'Agente de Ventas Nexos' : 'Atendente de Vendas Nexos',
         model: 'GPT4O',
         temperature: 0.7,
         isActive: true,
-        description: 'Qualifica leads, responde dúvidas sobre produtos e efetua pré-agendamento no WhatsApp e Webchat.',
-        systemPrompt: 'Você é um assistente de vendas da HelpUS especialista em atendimento rápido e humanizado.',
+        description: lang === 'en' ? 'Qualifies leads, answers product questions, and schedules meetings via WhatsApp and Webchat.' : 'Qualifica leads e efetua pré-agendamento no WhatsApp e Webchat.',
+        systemPrompt: 'HelpUS AI Sales Assistant',
         organization: { name: 'HelpUS Enterprise' }
       },
       {
         id: 'agent-2',
-        name: 'Suporte Técnico Nível 1',
-        subtitle: 'DeepSeek-R1 Relação Custo-Benefício',
+        name: lang === 'en' ? 'Technical Support Tier 1' : 'Suporte Técnico Nível 1',
         model: 'DEEPSEEK_R1',
         temperature: 0.2,
         isActive: true,
-        description: 'Resolve dúvidas técnicas com base na documentação da empresa usando busca vetorial RAG.',
-        systemPrompt: 'Você é o suporte técnico Nível 1. Consulte o manual antes de responder.',
+        description: lang === 'en' ? 'Resolves technical issues using documentation and RAG vector search.' : 'Resolve dúvidas técnicas com base no manual usando busca vetorial RAG.',
+        systemPrompt: 'HelpUS AI Technical Support',
         organization: { name: 'HelpUS Enterprise' }
       },
       {
         id: 'agent-3',
-        name: 'Agente Local Privado',
-        subtitle: 'Ollama Llama 3 Local (Full Node)',
+        name: lang === 'en' ? 'Private Local Agent' : 'Agente Local Privado',
         model: 'OLLAMA_LOCAL',
         temperature: 0.5,
         isActive: true,
-        description: 'Roda 100% na máquina local do cliente (Full Node em 127.0.0.1:8765) sem enviar dados para a nuvem.',
-        systemPrompt: 'Agente privado local para processamento de dados confidenciais.',
+        description: lang === 'en' ? 'Runs 100% on local machine (Full Node 127.0.0.1:8765) with complete privacy.' : 'Roda 100% na máquina local (Full Node 127.0.0.1:8765) com total privacidade.',
+        systemPrompt: 'HelpUS Local Confidential Agent',
         organization: { name: 'HelpUS Enterprise' }
       }
     ];
@@ -55,18 +57,16 @@ export default async function AgentsPage() {
   return (
     <>
       <section className='hero'>
-        <span className='badge'>Gerenciador de Agentes</span>
-        <h1>Agentes Autônomos de Inteligência Artificial</h1>
-        <p>
-          Crie e configure agentes de IA personalizados (GPT-4o, DeepSeek-R1, Ollama Local) treinados com a base de conhecimento da sua empresa e integrados ao WhatsApp Business API e Webchat.
-        </p>
+        <span className='badge'>{t.agents.badge}</span>
+        <h1>{t.agents.title}</h1>
+        <p>{t.agents.description}</p>
 
         <div className='actions'>
           <button className='button'>
-            <span>+ Criar Novo Agente</span>
+            <span>+ {t.agents.newAgentBtn}</span>
           </button>
-          <a href='/conversations' className='buttonSecondary'>
-            <span>Ver Conversas Ativas 💬</span>
+          <a href={`/conversations?lang=${lang}`} className='buttonSecondary'>
+            <span>{t.nav.conversations} 💬</span>
           </a>
         </div>
       </section>
@@ -77,7 +77,7 @@ export default async function AgentsPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span className='badge'>{agent.model}</span>
               <span style={{ fontSize: '0.75rem', fontWeight: '700', color: agent.isActive ? 'var(--emerald)' : 'var(--text-muted)' }}>
-                {agent.isActive ? '● Ativo' : '○ Inativo'}
+                {agent.isActive ? '● Active' : '○ Inactive'}
               </span>
             </div>
 
@@ -85,21 +85,12 @@ export default async function AgentsPage() {
             <p className='muted' style={{ marginBottom: '12px' }}>{agent.description}</p>
 
             <div className='kv'>
-              <div><span>Organização</span><strong>{agent.organization?.name || 'Default'}</strong></div>
-              <div><span>Temperatura</span><strong>{agent.temperature}</strong></div>
-              <div><span>Prompt Base</span><strong style={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{agent.systemPrompt.slice(0, 30)}...</strong></div>
+              <div><span>Organization</span><strong>{agent.organization?.name || 'Default'}</strong></div>
+              <div><span>Temperature</span><strong>{agent.temperature}</strong></div>
+              <div><span>System Prompt</span><strong style={{ fontSize: '0.78rem', fontFamily: 'monospace' }}>{agent.systemPrompt.slice(0, 30)}...</strong></div>
             </div>
           </article>
         ))}
-      </section>
-
-      <section className='card' style={{ marginTop: 24 }}>
-        <h2>Suporte Multi-Modelos (Multi-LLM Engine)</h2>
-        <ul className='list'>
-          <li><strong>OpenAI GPT-4o / GPT-4o-mini</strong>: Raciocínio avançado e atendimento corporativo.</li>
-          <li><strong>DeepSeek-R1 / V3</strong>: Altíssima velocidade de resposta com custo reduzido.</li>
-          <li><strong>Ollama / Local LLM</strong>: Execução 100% isolada e privada na máquina do cliente (Full Node).</li>
-        </ul>
       </section>
     </>
   );

@@ -1,5 +1,12 @@
 export type Language = 'pt' | 'en' | 'es';
 
+export function getLang(rawLang?: string): Language {
+  if (rawLang && ['pt', 'en', 'es'].includes(rawLang)) {
+    return rawLang as Language;
+  }
+  return 'en';
+}
+
 export interface TranslationSchema {
   nav: {
     dashboard: string;
