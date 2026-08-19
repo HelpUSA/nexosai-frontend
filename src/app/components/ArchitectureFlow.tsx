@@ -42,7 +42,7 @@ export default function ArchitectureFlow() {
  const data = await res.json();
  if (data.db_query?.rows) {
  setMessages(data.db_query.rows);
- const chats = Array.from(new Set(data.db_query.rows.flatMap((m: any) => [m.source_chat_id, m.target_chat_id]).filter(Boolean)));
+ const chats: string[] = Array.from(new Set<string>(data.db_query.rows.flatMap((m: any) => [m.source_chat_id, m.target_chat_id]).filter(Boolean) as string[]));
  setActiveChats(chats.slice(0, 6));
 
  // Calculate stats
@@ -135,17 +135,22 @@ export default function ArchitectureFlow() {
  const tn = nodes[to];
  if (!fn || !tn) return;
  
+ const x1 = (fn.x * canvas.width) / 100 / 2;
+ const y1 = (fn.y * canvas.height) / 100 / 2;
+ const x2 = (tn.x * canvas.width) / 100 / 2;
+ const y2 = (tn.y * canvas.height) / 100 / 2;
+
  ctx.beginPath();
- ctx.moveTo(String(fn.x) + '%', String(fn.y) + '%');
- ctx.lineTo(String(tn.x) + '%', String(tn.y) + '%');
+ ctx.moveTo(x1, y1);
+ ctx.lineTo(x2, y2);
  ctx.strokeStyle = '#1a1a2e';
  ctx.lineWidth = 1;
  ctx.stroke();
  
  // Glow line
  ctx.beginPath();
- ctx.moveTo(String(fn.x) + '%', String(fn.y) + '%');
- ctx.lineTo(String(tn.x) + '%', String(tn.y) + '%');
+ ctx.moveTo(x1, y1);
+ ctx.lineTo(x2, y2);
  ctx.strokeStyle = `${fn.color}15`;
  ctx.lineWidth = 3;
  ctx.stroke();
@@ -157,55 +162,30 @@ export default function ArchitectureFlow() {
  const tn = nodes[p.to];
  if (!fn || !tn) return;
  
- const x = fn.x + (tn.x - fn.x) * (p.progress / 100);
- const y = fn.y + (tn.y - fn.y) * (p.progress / 100);
+ const px = ((fn.x + (tn.x - fn.x) * (p.progress / 100)) * canvas.width) / 100 / 2;
+ const py = ((fn.y + (tn.y - fn.y) * (p.progress / 100)) * canvas.height) / 100 / 2;
  const alpha = 0.4 + 0.6 * Math.sin((p.progress / 100) * Math.PI);
  
  ctx.beginPath();
- ctx.arc(String(x) + '%', String(y) + '%', 2.5, 0, Math.PI * 2);
+ ctx.arc(px, py, 2.5, 0, Math.PI * 2);
  ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
  ctx.fill();
  
  // Trail
  ctx.beginPath();
- ctx.arc(String(x) + '%', String(y) + '%', 6, 0, Math.PI * 2);
+ ctx.arc(px, py, 6, 0, Math.PI * 2);
  ctx.fillStyle = p.color + '10';
  ctx.fill();
  });
 
  // Draw nodes
  Object.values(nodes).forEach(node => {
- // Outer glow
- const gradient = ctx.createRadialGradient(String(node.x) + '%', String(node.y) + '%', node.r * 0.5, String(node.x) + '%', String(node.y) + '%', node.r * 1.5);
- gradient.addColorStop(0, node.color + '30');
- gradient.addColorStop(1, 'transparent');
- ctx.beginPath();
- ctx.arc(String(node.x) + '%', String(node.y) + '%', node.r * 1.5, 0, Math.PI * 2);
- ctx.fillStyle = gradient;
- ctx.fill();
-
- // Node circle
- ctx.beginPath();
- ctx.arc(String(node.x) + '%', String(node.y) + '%', node.r, 0, Math.PI * 2);
- ctx.fillStyle = '#0a0a0a';
- ctx.fill();
- ctx.strokeStyle = node.color;
- ctx.lineWidth = 1.5;
- ctx.stroke();
-
- // Pulse animation
- const pulse = 1 + 0.05 * Math.sin(frame * 0.05);
- ctx.beginPath();
- ctx.arc(String(node.x) + '%', String(node.y) + '%', node.r * pulse, 0, Math.PI * 2);
- ctx.strokeStyle = node.color + '40';
- ctx.lineWidth = 1;
- ctx.stroke();
-
- // Label
- ctx.fillStyle = '#e0e0e0';
- ctx.font = '8px monospace';
- ctx.textAlign = 'center';
- ctx.fillText(node.label, String(node.x) + '%', (node.y + node.r + 10) + '%');
+   const nx = (node.x * canvas.width) / 100 / 2;
+   const ny = (node.y * canvas.height) / 100 / 2;
+   ctx.textAlign = 'center';
+   ctx.fillStyle = '#e0e0e0';
+   ctx.font = '8px monospace';
+   ctx.fillText(node.label, nx, ny + node.r + 10);
  });
 
  frame++;
