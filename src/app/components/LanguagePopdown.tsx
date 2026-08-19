@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface LanguagePopdownProps {
   currentLang?: string;
@@ -9,6 +9,16 @@ interface LanguagePopdownProps {
 export function LanguagePopdown({ currentLang = 'en' }: LanguagePopdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedLang, setSelectedLang] = useState(currentLang);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlLang = params.get('lang');
+      if (urlLang && ['en', 'es', 'pt'].includes(urlLang)) {
+        setSelectedLang(urlLang);
+      }
+    }
+  }, []);
 
   const getLabel = (code: string) => {
     switch (code) {
@@ -22,10 +32,9 @@ export function LanguagePopdown({ currentLang = 'en' }: LanguagePopdownProps) {
   const handleSelect = (code: string) => {
     setSelectedLang(code);
     setIsOpen(false);
-    // Push query param
     const url = new URL(window.location.href);
     url.searchParams.set('lang', code);
-    window.history.pushState({}, '', url.toString());
+    window.location.href = url.toString();
   };
 
   return (
@@ -33,6 +42,7 @@ export function LanguagePopdown({ currentLang = 'en' }: LanguagePopdownProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="hub-lang-trigger"
+        type="button"
       >
         <span>🌐</span>
         <span>{getLabel(selectedLang)}</span>
@@ -40,20 +50,23 @@ export function LanguagePopdown({ currentLang = 'en' }: LanguagePopdownProps) {
       </button>
 
       {isOpen && (
-        <div className="hub-lang-popdown" onClick={() => setIsOpen(false)}>
+        <div className="hub-lang-popdown">
           <button
+            type="button"
             onClick={() => handleSelect('en')}
             className={`hub-lang-option ${selectedLang === 'en' ? 'active' : ''}`}
           >
             <span>🇺🇸</span> <span>English</span>
           </button>
           <button
+            type="button"
             onClick={() => handleSelect('es')}
             className={`hub-lang-option ${selectedLang === 'es' ? 'active' : ''}`}
           >
             <span>🇪🇸</span> <span>Español</span>
           </button>
           <button
+            type="button"
             onClick={() => handleSelect('pt')}
             className={`hub-lang-option ${selectedLang === 'pt' ? 'active' : ''}`}
           >
