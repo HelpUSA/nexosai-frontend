@@ -1,5 +1,7 @@
 import { translations, getLang } from '@/i18n/translations';
 import ArchitectureFlow from './components/ArchitectureFlow';
+import { AtlassianShowcase } from './components/AtlassianShowcase';
+import { AtlassianCarousel } from './components/AtlassianCarousel';
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
   const resolvedParams = await searchParams;
@@ -8,13 +10,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      {/* Hero Showcase Banner with HelpUS Branding */}
+      {/* Atlassian-Inspired Hero Showcase Banner with HelpUS Logo */}
       <section className='hero-showcase'>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
           <img
             src='/helpus_logo.png'
             alt='HelpUS Logo'
-            style={{ height: '44px', width: 'auto' }}
+            style={{ height: '52px', width: 'auto', objectFit: 'contain' }}
           />
           <span className='hero-pill-badge'>
             ✨ SECURE AI AGENT ORCHESTRATION PLATFORM
@@ -23,44 +25,44 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
         <h1 className='hero-gradient-title'>
           {lang === 'pt' ? (
-            <>Malha de Agentes de IA Autônomos & <span>Orquestração Multi-LLM</span></>
+            <>Impossível sozinho. Possível com a <span>Malha de IA NexosAI</span></>
           ) : lang === 'es' ? (
-            <>Malla de Agentes de IA Autónomos y <span>Orquestación Multi-LLM</span></>
+            <>Imposible solo. Posible con la <span>Malla de IA NexosAI</span></>
           ) : (
-            <>Autonomous AI Agent Mesh & <span>Multi-LLM Orchestration</span></>
+            <>Impossible alone. Possible with <span>NexosAI Cloud Mesh</span></>
           )}
         </h1>
 
         <p className='hero-lead-text'>
           {lang === 'pt'
-            ? 'O NexosAI Cloud coordena agentes de inteligência artificial, nós de execução local com total privacidade, busca vetorial RAG e roteamento de mensagens no WhatsApp e Webchat sob controle rígido de segurança.'
+            ? 'O NexosAI Cloud orquestra agentes de inteligência artificial, nós de execução local com privacidade total, busca vetorial RAG e relés de atendimento corporativo sob rigorosos controles de segurança.'
             : lang === 'es'
-            ? 'NexosAI Cloud coordina agentes de inteligencia artificial, nodos de ejecución local con total privacidad, búsqueda vectorial RAG y enrutamiento de mensajes en WhatsApp y Webchat.'
-            : 'NexosAI Cloud coordinates autonomous AI agents, private local execution nodes, RAG vector knowledge bases, and multi-channel messaging (WhatsApp & Webchat) under unified enterprise security.'}
+            ? 'NexosAI Cloud orquesta agentes de inteligencia artificial, nodos de ejecución local con privacidad total, búsqueda vectorial RAG y relés de atención corporativa.'
+            : 'NexosAI Cloud orchestrates autonomous AI agents, private local execution nodes, RAG vector knowledge bases, and multi-channel relays under unified enterprise security.'}
         </p>
 
         {/* Action CTAs */}
-        <div className='actions'>
-          <a href={`/agents?lang=${lang}`} className='button' style={{ padding: '12px 24px', fontSize: '0.98rem' }}>
+        <div className='actions' style={{ gap: '14px' }}>
+          <a href={`/agents?lang=${lang}`} className='button' style={{ padding: '14px 28px', fontSize: '1rem' }}>
             <span>Explore AI Agents 🤖</span>
           </a>
-          <a href={`/downloads?lang=${lang}`} className='buttonSecondary' style={{ padding: '12px 20px', fontSize: '0.92rem' }}>
+          <a href={`/downloads?lang=${lang}`} className='buttonSecondary' style={{ padding: '14px 24px', fontSize: '0.95rem' }}>
             <span>Download AI Bridge Setup.exe 📥</span>
           </a>
-          <a href='#mesh-architecture' className='buttonSecondary' style={{ padding: '12px 20px', fontSize: '0.92rem' }}>
-            <span>Live Mesh Architecture ⚡</span>
+          <a href='#showcase-tabs' className='buttonSecondary' style={{ padding: '14px 24px', fontSize: '0.95rem' }}>
+            <span>View Architecture Features ⚡</span>
           </a>
         </div>
 
-        {/* Live Metrics Counter Strip */}
+        {/* Atlassian-Style Metrics Counter Strip */}
         <div className='metrics-strip'>
           <div className='metric-box'>
             <div className='metric-number'>100%</div>
-            <div className='metric-label'>Local Privacy Option</div>
+            <div className='metric-label'>Local Privacy (Ollama)</div>
           </div>
           <div className='metric-box'>
             <div className='metric-number'>&lt; 250ms</div>
-            <div className='metric-label'>Mesh Relay Latency</div>
+            <div className='metric-label'>Relay Latency</div>
           </div>
           <div className='metric-box'>
             <div className='metric-number'>Multi-LLM</div>
@@ -73,13 +75,23 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
       </section>
 
-      {/* Live Interactive Architecture Flow Diagram Section */}
+      {/* Atlassian Interactive Tab Showcase */}
+      <section id='showcase-tabs'>
+        <AtlassianShowcase lang={lang} />
+      </section>
+
+      {/* Live Interactive Architecture Flow Diagram */}
       <section id='mesh-architecture' style={{ marginBottom: '36px' }}>
         <ArchitectureFlow />
       </section>
 
-      {/* Multi-LLM Engine & Mesh Capabilities Showcase Grid */}
-      <section style={{ marginBottom: '36px' }}>
+      {/* Enterprise Use Case Carousel (Atlassian Style) */}
+      <section>
+        <AtlassianCarousel lang={lang} />
+      </section>
+
+      {/* Multi-LLM & Mesh Capability Cards Grid */}
+      <section style={{ margin: '36px 0' }}>
         <div style={{ marginBottom: '24px' }}>
           <span className='badge'>Capacidades do Sistema</span>
           <h2 style={{ fontSize: '1.8rem', fontWeight: '800', color: 'var(--text-dark)' }}>
@@ -192,26 +204,26 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
       </section>
 
-      {/* Quick Setup Download Banner */}
-      <section className='card' style={{ background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)', borderColor: '#bfdbfe', padding: '36px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <img src='/helpus_logo.png' alt='HelpUS Logo' style={{ height: '56px', width: 'auto' }} />
+      {/* Atlassian-Style Setup CTA Banner with HelpUS Branding */}
+      <section className='card' style={{ background: 'linear-gradient(135deg, #0052cc 0%, #0747a6 50%, #172b4d 100%)', border: 'none', color: '#ffffff', padding: '44px', borderRadius: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <img src='/helpus_logo.png' alt='HelpUS Logo' style={{ height: '64px', width: 'auto', background: '#ffffff', padding: '6px', borderRadius: '14px' }} />
             <div>
-              <h3 style={{ fontSize: '1.4rem', fontWeight: '800', color: 'var(--text-dark)' }}>
-                {lang === 'pt' ? 'Pronto para conectar seu primeiro nó?' : lang === 'es' ? '¿Listo para conectar su primer nodo?' : 'Ready to connect your first node?'}
+              <h3 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#ffffff', marginBottom: '4px' }}>
+                {lang === 'pt' ? 'Pronto para orquestrar seus agentes de IA?' : lang === 'es' ? '¿Listo para orquestar sus agentes de IA?' : 'Ready to orchestrate your AI Agent Mesh?'}
               </h3>
-              <p className='muted' style={{ margin: 0 }}>
-                {lang === 'pt' ? 'Baixe o instalador da AI Bridge local ou acesse o dashboard completo do NexosAI Cloud.' : 'Download the local AI Bridge setup or access the full NexosAI Cloud dashboard.'}
+              <p style={{ fontSize: '1rem', color: 'rgba(255, 255, 255, 0.85)', margin: 0 }}>
+                {lang === 'pt' ? 'Baixe o instalador da AI Bridge local ou acesse o dashboard do NexosAI Cloud.' : 'Download the local AI Bridge setup executable or access the full NexosAI Cloud dashboard.'}
               </p>
             </div>
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <a href={`/downloads?lang=${lang}`} className='button' style={{ padding: '12px 20px' }}>
+            <a href={`/downloads?lang=${lang}`} className='button' style={{ background: '#ffffff', color: '#0052cc', padding: '14px 24px', fontWeight: '800' }}>
               <span>Setup AI Bridge 📥</span>
             </a>
-            <a href={`/dashboard?lang=${lang}`} className='buttonSecondary' style={{ padding: '12px 20px' }}>
+            <a href={`/dashboard?lang=${lang}`} className='buttonSecondary' style={{ background: 'rgba(255,255,255,0.15)', color: '#ffffff', borderColor: 'rgba(255,255,255,0.3)', padding: '14px 24px', fontWeight: '700' }}>
               <span>Open Dashboard ⚡</span>
             </a>
           </div>
