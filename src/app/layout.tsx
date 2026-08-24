@@ -5,6 +5,11 @@ import { Navbar } from './components/Navbar';
 export const metadata: Metadata = {
   title: 'NexosAI Cloud — AI Agent Mesh & Orchestration Platform',
   description: 'NexosAI Cloud Mesh: Secure enterprise orchestration for autonomous AI agents, multi-LLM routing, and local execution nodes.',
+  icons: {
+    icon: '/helpus_logo.png',
+    shortcut: '/helpus_logo.png',
+    apple: '/helpus_logo.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
