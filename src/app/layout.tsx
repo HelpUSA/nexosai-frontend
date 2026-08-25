@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Navbar } from './components/Navbar';
+import AnimatedBackground from '@/components/AnimatedBackground';
 
 export const metadata: Metadata = {
   title: 'NexosAI Cloud — AI Agent Mesh & Orchestration Platform',
@@ -16,7 +17,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang='en'>
       <body>
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-main)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg-main)', position: 'relative', overflow: 'hidden' }}>
+          <AnimatedBackground />
           
           {/* Responsive Top Navigation Header */}
           <Navbar lang="en" />
