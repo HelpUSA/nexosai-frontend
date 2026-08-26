@@ -18,7 +18,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             alt='HelpUS Logo'
             style={{ height: '52px', width: 'auto', objectFit: 'contain' }}
           />
-          <span className='hero-pill-badge'>
+          <span className='hero-pill-badge animate-float-badge'>
             ✨ SECURE AI AGENT ORCHESTRATION PLATFORM
           </span>
         </div>
@@ -43,32 +43,32 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
         {/* Action CTAs */}
         <div className='actions' style={{ gap: '14px' }}>
-          <a href={`/agents?lang=${lang}`} className='button' style={{ padding: '14px 28px', fontSize: '1rem' }}>
+          <a href={`/agents?lang=${lang}`} className='button shimmer-button' style={{ padding: '14px 28px', fontSize: '1rem' }}>
             <span>Explore AI Agents 🤖</span>
           </a>
-          <a href={`/downloads?lang=${lang}`} className='buttonSecondary' style={{ padding: '14px 24px', fontSize: '0.95rem' }}>
+          <a href={`/downloads?lang=${lang}`} className='buttonSecondary animated-glow-card' style={{ padding: '14px 24px', fontSize: '0.95rem' }}>
             <span>Download AI Bridge Setup.exe 📥</span>
           </a>
-          <a href='#showcase-tabs' className='buttonSecondary' style={{ padding: '14px 24px', fontSize: '0.95rem' }}>
+          <a href='#showcase-tabs' className='buttonSecondary animated-glow-card' style={{ padding: '14px 24px', fontSize: '0.95rem' }}>
             <span>View Architecture Features ⚡</span>
           </a>
         </div>
 
         {/* Atlassian-Style Metrics Counter Strip */}
         <div className='metrics-strip'>
-          <div className='metric-box'>
+          <div className='metric-box metric-box-glow'>
             <div className='metric-number'>100%</div>
             <div className='metric-label'>Local Privacy (Ollama)</div>
           </div>
-          <div className='metric-box'>
+          <div className='metric-box metric-box-glow'>
             <div className='metric-number'>&lt; 250ms</div>
             <div className='metric-label'>Relay Latency</div>
           </div>
-          <div className='metric-box'>
+          <div className='metric-box metric-box-glow'>
             <div className='metric-number'>Multi-LLM</div>
             <div className='metric-label'>GPT-4o, DeepSeek & Ollama</div>
           </div>
-          <div className='metric-box'>
+          <div className='metric-box metric-box-glow'>
             <div className='metric-number'>24 / 7</div>
             <div className='metric-label'>Autonomous Execution</div>
           </div>

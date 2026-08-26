@@ -785,3 +785,64 @@ nav a.active {
   100% { transform: translate(-60px, 30px) scale(1); }
 }
 
+/* Micro-Animations & Glow Effects */
+.animate-float-badge {
+  animation: floatBadge 4s ease-in-out infinite alternate;
+}
+
+@keyframes floatBadge {
+  0% { transform: translateY(0px); }
+  100% { transform: translateY(-6px); }
+}
+
+.animated-glow-card {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animated-glow-card:hover {
+  transform: translateY(-5px) scale(1.01);
+  box-shadow: 0 20px 35px -10px rgba(37, 99, 235, 0.15), 0 0 15px rgba(79, 70, 229, 0.1);
+  border-color: rgba(147, 197, 253, 0.8) !important;
+}
+
+.metric-box-glow {
+  transition: all 0.3s ease;
+}
+
+.metric-box-glow:hover {
+  transform: translateY(-3px);
+  background: rgba(37, 99, 235, 0.06);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+.shimmer-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.shimmer-button::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    60deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 70%
+  );
+  transform: rotate(30deg);
+  animation: shimmerAnim 6s infinite;
+}
+
+@keyframes shimmerAnim {
+  0% { transform: translateX(-100%) rotate(30deg); }
+  20% { transform: translateX(100%) rotate(30deg); }
+  100% { transform: translateX(100%) rotate(30deg); }
+}
+
+
