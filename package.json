@@ -9,26 +9,26 @@
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "test": "node --test test/n1a-auth-env.test.mjs"
   },
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
-    "@auth/prisma-adapter": "latest",
-    "@prisma/client": "^6.19.3",
-    "next": "latest",
-    "next-auth": "latest",
-    "prisma": "^6.19.3",
-    "react": "latest",
-    "react-dom": "latest",
-    "zod": "latest"
+    "@prisma/client": "6.19.3",
+    "next": "16.4.3",
+    "next-auth": "4.24.15",
+    "prisma": "6.19.3",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "zod": "4.4.3"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "eslint": "latest",
-    "eslint-config-next": "latest",
-    "typescript": "latest"
+    "@types/node": "25.9.1",
+    "@types/react": "19.2.15",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.4.3",
+    "typescript": "6.0.3"
   }
 }
