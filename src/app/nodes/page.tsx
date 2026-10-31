@@ -1,3 +1,4 @@
+import { DemoBanner } from '@/app/components/DemoBanner';
 import { translations, getLang } from '@/i18n/translations';
 
 export default async function NodesPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
@@ -9,25 +10,26 @@ export default async function NodesPage({ searchParams }: { searchParams: Promis
     {
       name: 'Notebook Principal',
       type: 'Full Node',
-      status: 'online-ready',
+      status: 'UNKNOWN',
       detail: 'Extensão + AI Bridge local + Control Center + gateway 8765',
     },
     {
       name: 'Browser Relay Node',
       type: 'Light Node',
-      status: 'active',
+      status: 'UNKNOWN',
       detail: 'Extensão apenas para relay de mensagens e presença no navegador',
     },
     {
       name: 'PC Backup Workstation',
       type: 'Full Node',
-      status: 'standby',
+      status: 'UNKNOWN',
       detail: 'Instalação recuperável para continuidade operacional',
     },
   ];
 
   return (
     <>
+      <DemoBanner lang={lang} />
       <section className='hero'>
         <span className='badge'>{t.nodes.badge}</span>
         <h1>{t.nodes.title}</h1>

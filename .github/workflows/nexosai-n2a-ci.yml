@@ -1,0 +1,46 @@
+name: NexosAI N2-A Demo UI Draft QA
+on:
+  push:
+    branches: ['feat/n2a-*']
+  pull_request:
+    branches: ['main']
+jobs:
+  demo-ui:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    env:
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      # Upstream lock is out of sync. Temporary CI resolution must not be confused with a reproducible release.
+      - run: npm install --ignore-scripts --no-fund
+      - name: Record existing dependency vulnerabilities (release blocker)
+        continue-on-error: true
+        run: npm audit --audit-level=moderate
+      - name: Protect DEMO status/provenance invariants
+        shell: bash
+        run: |
+          grep -q 'DEMONSTRATION MODE' src/i18n/demo.ts
+          grep -q 'MODO DEMONSTRAÇÃO' src/i18n/demo.ts
+          grep -q 'MODO DEMOSTRACIÓN' src/i18n/demo.ts
+          grep -q "status: 'UNKNOWN'" src/app/nodes/page.tsx
+          if grep -Eq "from '@/lib/db'|db\.agent\.findMany|db\.auditLog\.findMany" src/app/agents/page.tsx src/app/audit/page.tsx; then
+            echo 'Unauthenticated DB reads must not reappear in DEMO views' >&2; exit 1
+          fi
+          if grep -q 'Live System Architecture' src/app/status/page.tsx; then
+            echo 'Misleading LIVE label remains' >&2; exit 1
+          fi
+      - run: npx prisma generate
+      - run: npm run build

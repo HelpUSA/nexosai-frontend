@@ -1,3 +1,4 @@
+import { DemoBanner } from '@/app/components/DemoBanner';
 import { translations, getLang } from '@/i18n/translations';
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
@@ -7,6 +8,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
+      <DemoBanner lang={lang} />
       <section className='hero'>
         <span className='badge'>{t.admin.badge}</span>
         <h1>{t.admin.title}</h1>
@@ -17,7 +19,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <article className='card'>
           <h2>Organization Permissions & Roles</h2>
           <div className='kv'>
-            <div><span>Bootstrap Admin</span><strong>helpus.ecommerce@gmail.com</strong></div>
+            <div><span>Bootstrap Admin</span><strong>demo-user@example.invalid</strong></div>
             <div><span>Default Role</span><strong>VIEWER</strong></div>
             <div><span>OAuth Provider</span><strong>Google Auth</strong></div>
           </div>
@@ -26,7 +28,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <article className='card'>
           <h2>API Credentials & Keys</h2>
           <div className='kv'>
-            <div><span>OpenAI API</span><strong>Configured (GPT-4o)</strong></div>
+            <div><span>OpenAI API</span><strong>UNKNOWN — DEMO</strong></div>
             <div><span>DeepSeek API</span><strong>Configured (R1 / V3)</strong></div>
             <div><span>Local Ollama Bridge</span><strong>127.0.0.1:8765</strong></div>
           </div>

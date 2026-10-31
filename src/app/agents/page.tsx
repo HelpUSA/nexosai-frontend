@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { DemoBanner } from '@/app/components/DemoBanner';
 import { translations, getLang } from '@/i18n/translations';
 
 export default async function AgentsPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
@@ -6,21 +6,9 @@ export default async function AgentsPage({ searchParams }: { searchParams: Promi
   const lang = getLang(resolvedParams?.lang);
   const t = translations[lang] || translations.en;
 
-  // Fetch agents or fallback demo items
-  let agents: any[] = [];
-  try {
-    agents = await db.agent.findMany({
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-      include: { organization: true }
-    });
-  } catch (e) {
-    console.error('Failed to load agents from db:', e);
-  }
+  // Synthetic preview ONLY. Do not query unprotected organization data.
+  const agents: any[] = [
 
-  // Fallback demo agents if db is empty or disconnected
-  if (agents.length === 0) {
-    agents = [
       {
         id: 'agent-1',
         name: lang === 'en' ? 'Sales Agent Nexos' : lang === 'es' ? 'Agente de Ventas Nexos' : 'Atendente de Vendas Nexos',
@@ -52,10 +40,10 @@ export default async function AgentsPage({ searchParams }: { searchParams: Promi
         organization: { name: 'HelpUS Enterprise' }
       }
     ];
-  }
 
   return (
     <>
+      <DemoBanner lang={lang} />
       <section className='hero'>
         <span className='badge'>{t.agents.badge}</span>
         <h1>{t.agents.title}</h1>
