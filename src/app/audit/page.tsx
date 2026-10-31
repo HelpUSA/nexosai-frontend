@@ -14,7 +14,7 @@ export default async function AuditLogsPage({ searchParams }: { searchParams: Pr
         action: 'NODE_HEARTBEAT_OK',
         severity: 'INFO',
         details: 'Full Node (Main Workstation) presence confirmed on 127.0.0.1:8765',
-        user: { email: 'helpus.ecommerce@gmail.com' },
+        user: { email: 'demo-user@example.invalid' },
         node: { name: 'Main Workstation' },
         createdAt: new Date()
       },
@@ -23,7 +23,7 @@ export default async function AuditLogsPage({ searchParams }: { searchParams: Pr
         action: 'AGENT_PROMPT_UPDATED',
         severity: 'INFO',
         details: 'Sales AI Agent system prompt updated by Administrator',
-        user: { email: 'helpus.ecommerce@gmail.com' },
+        user: { email: 'demo-user@example.invalid' },
         node: null,
         createdAt: new Date(Date.now() - 3600000)
       },
