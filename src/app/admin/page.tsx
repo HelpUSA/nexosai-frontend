@@ -1,3 +1,4 @@
+import { DemoBanner } from '@/app/components/DemoBanner';
 import { translations, getLang } from '@/i18n/translations';
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
@@ -7,6 +8,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
+      <DemoBanner lang={lang} />
       <section className='hero'>
         <span className='badge'>{t.admin.badge}</span>
         <h1>{t.admin.title}</h1>
