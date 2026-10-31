@@ -6,7 +6,11 @@ on:
     branches: ['feat/n1a-*']
 jobs:
   membership-guards:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 18
     env:
       AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
