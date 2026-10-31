@@ -1,0 +1,48 @@
+name: NexosAI Dependency Lockfile Recovery LAB
+on:
+  push:
+    branches: ['fix/n1a-dependency-lockfile-lab-20261031']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  regenerate-lock-in-isolated-branch:
+    if: github.repository == 'HelpUSA/nexosai-frontend' && github.ref == 'refs/heads/fix/n1a-dependency-lockfile-lab-20261031'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Reconcile package-lock deterministically
+        run: npm install --package-lock-only --ignore-scripts --no-fund
+      - name: Verify reproducible clean npm ci
+        run: npm ci --ignore-scripts --no-fund
+      - name: Validate lab test suite
+        run: npm test
+      - name: Generate Prisma client and build (synthetic only)
+        run: |
+          npx prisma generate
+          npm run build
+      - name: Commit generated lockfile ONLY to isolated Draft branch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix(n1a-deps): regenerate verified npm lockfile in lab branch [skip ci]'
+            git push origin HEAD:fix/n1a-dependency-lockfile-lab-20261031
+          fi
+      - name: High and critical audit (MUST fail if unresolved)
+        run: npm audit --audit-level=high
