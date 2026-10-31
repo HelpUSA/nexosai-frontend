@@ -41,7 +41,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -- package-lock.json
           if ! git diff --cached --quiet; then
-            git commit -m 'fix(n1a-deps): regenerate verified npm lockfile in lab branch [skip ci]'
+            git commit -m 'fix(n1a-deps): regenerate verified npm lockfile in lab branch'
             git push origin HEAD:fix/n1a-dependency-lockfile-lab-20261031
           fi
       - name: High and critical audit (MUST fail if unresolved)
