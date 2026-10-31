@@ -20,7 +20,7 @@ test('high/critical transitive remediation present in lock and manifest',()=>{
 test('do not accidentally declare synthetic integration tests as already passing',()=>{
   const doc=readFileSync(new URL('../docs/N1A-ORDER-028-RUNTIME-SECURITY-TEST-PLAN.md',import.meta.url),'utf8');
   assert.match(doc,/TEST PLAN ONLY/);
-  assert.match(doc,/do not establish OAuth\/session security/i);
+  assert.match(doc,/do (?:\*\*not\*\*|not) establish OAuth\/session security/i);
   assert.match(doc,/T1/);
   assert.match(doc,/T10/);
 });
