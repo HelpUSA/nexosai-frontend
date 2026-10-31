@@ -1,0 +1,31 @@
+name: NexosAI Auth Runtime Risk Lab Inventory
+on:
+  push:
+    branches: ['test/n1a-auth-runtime-risk-lab-*']
+  pull_request:
+    branches: ['fix/n1a-dependency-lockfile-lab-20261031']
+permissions:
+  contents: read
+jobs:
+  inventory:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - run: node --test test/n1a-security-inventory.test.mjs test/n1a-auth-env.test.mjs
+      - name: Inspect exact NextAuth Auth.js dependency tree
+        run: npm ls next-auth @auth/core cookie jose openid-client oauth4webapi --all
+        continue-on-error: true
+      - name: Enforce zero known production dependency advisories (all severities)
+        run: npm audit --omit=dev --audit-level=low
+      - name: Enforce blocking high/critical audit
+        run: npm audit --audit-level=high
