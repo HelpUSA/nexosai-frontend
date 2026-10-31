@@ -1,3 +1,4 @@
+import { DemoBanner } from '@/app/components/DemoBanner';
 import { translations, getLang } from '@/i18n/translations';
 
 export default async function ConversationsPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
@@ -14,6 +15,7 @@ export default async function ConversationsPage({ searchParams }: { searchParams
 
   return (
     <>
+      <DemoBanner lang={lang} />
       <section className='hero'>
         <span className='badge'>{t.conversations.badge}</span>
         <h1>{t.conversations.title}</h1>
