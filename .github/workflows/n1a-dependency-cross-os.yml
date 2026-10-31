@@ -1,0 +1,35 @@
+name: NexosAI P0 Dependency Security Cross-OS LAB
+on:
+  push:
+    branches: ['fix/n1a-dependency-lockfile-lab-20261031']
+  pull_request:
+    branches: ['feat/n1a-nextauth-failclosed-20261031']
+permissions:
+  contents: read
+jobs:
+  verify-committed-lock:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Clean installation must work with committed package-lock
+        run: npm ci --ignore-scripts --no-fund
+      - run: npm test
+      - run: npx prisma generate
+      - run: npm run build
+      - name: Mandatory HIGH and CRITICAL npm security gate
+        run: npm audit --audit-level=high
