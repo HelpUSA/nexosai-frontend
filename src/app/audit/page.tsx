@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { DemoBanner } from '@/app/components/DemoBanner';
 import { translations, getLang } from '@/i18n/translations';
 
 export default async function AuditLogsPage({ searchParams }: { searchParams: Promise<{ lang?: string }> | { lang?: string } }) {
@@ -6,20 +6,9 @@ export default async function AuditLogsPage({ searchParams }: { searchParams: Pr
   const lang = getLang(resolvedParams?.lang);
   const t = translations[lang] || translations.en;
 
-  let logs: any[] = [];
-  try {
-    logs = await db.auditLog.findMany({
-      take: 15,
-      orderBy: { createdAt: 'desc' },
-      include: { user: true, node: true }
-    });
-  } catch (e) {
-    console.error('Failed to load audit logs from db:', e);
-  }
+  // Synthetic preview ONLY. Do not query unprotected organization data.
+  const logs: any[] = [
 
-  // Fallback demo audit logs if db is empty or disconnected
-  if (logs.length === 0) {
-    logs = [
       {
         id: 'log-1',
         action: 'NODE_HEARTBEAT_OK',
@@ -48,10 +37,10 @@ export default async function AuditLogsPage({ searchParams }: { searchParams: Pr
         createdAt: new Date(Date.now() - 7200000)
       }
     ];
-  }
 
   return (
     <>
+      <DemoBanner lang={lang} />
       <section className='hero'>
         <span className='badge'>{t.audit.badge}</span>
         <h1>{t.audit.title}</h1>
