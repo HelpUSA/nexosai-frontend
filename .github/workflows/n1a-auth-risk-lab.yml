@@ -25,8 +25,7 @@ jobs:
       - name: Inspect exact NextAuth Auth.js dependency tree
         run: npm ls next-auth @auth/core cookie jose openid-client oauth4webapi --all
         continue-on-error: true
-      - name: Export production-only audit for manual triage, never auto-accept
-        run: npm audit --omit=dev --json > prod-audit.json
-        continue-on-error: true
+      - name: Enforce zero known production dependency advisories (all severities)
+        run: npm audit --omit=dev --audit-level=low
       - name: Enforce blocking high/critical audit
         run: npm audit --audit-level=high
