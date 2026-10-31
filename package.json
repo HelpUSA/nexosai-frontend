@@ -21,7 +21,7 @@
     "prisma": "6.19.3",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "zod": "4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "25.9.1",
@@ -30,5 +30,12 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.4.3",
     "typescript": "6.0.3"
+  },
+  "overrides": {
+    "@auth/core": "0.41.3",
+    "deepmerge-ts": "8.0.2",
+    "browserslist": "^4.29.5",
+    "js-yaml": "^4.3.2",
+    "brace-expansion": "^1.1.21"
   }
 }
