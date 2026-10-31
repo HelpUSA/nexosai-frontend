@@ -1,0 +1,33 @@
+name: NexosAI N1-B Membership Lab QA
+on:
+  push:
+    branches: ['feat/n1b-*']
+  pull_request:
+    branches: ['feat/n1a-*']
+jobs:
+  membership-guards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: node --test test/n1a-auth-env.test.mjs test/n1b-tenant-guards.test.mjs
+      - name: Install deps despite known upstream inconsistent lockfile
+        run: npm install --ignore-scripts --no-fund
+      - name: Record existing dependency vulnerabilities (release blocker)
+        continue-on-error: true
+        run: npm audit --audit-level=moderate
+      - run: npx prisma validate
+        env:
+          DATABASE_URL: postgresql://g3bplus_user:synthetic@127.0.0.1:55434/g3bplus_nexosai
+      - run: npx prisma generate
+      - run: npm run build
