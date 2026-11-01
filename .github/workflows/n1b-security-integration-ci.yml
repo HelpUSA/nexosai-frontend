@@ -1,0 +1,94 @@
+name: NexosAI N1-B Stacked Security Integration Candidate LAB
+on:
+  push:
+    branches: ['integration/n1b-security-sandbox-20261101']
+  pull_request:
+    branches: ['test/n1b-google-provider-https-20261101']
+permissions:
+  contents: read
+jobs:
+  cross-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+        node: ['22','24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-n1b-candidate-gate-key-do-not-use-production-2026
+      GOOGLE_CLIENT_ID: synthetic-google-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-google-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@lab.invalid
+      DATABASE_URL: postgresql://invalid:invalid@127.0.0.1:9/no-real-database
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Complete auth, GoogleProvider and tenant RBAC regressions
+        run: node --test test/n1a-auth-env.test.mjs test/n1a-security-inventory.test.mjs test/n1a-oidc-http-integration.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1b-prisma-session-guard.test.mjs test/n1b-google-admission.test.mjs test/n1b-google-provider-oidc-http.test.mjs test/n1b-audit-tenant-access.test.mjs
+      - name: Ephemeral TLS certificate and NextAuth secure cookie test
+        if: runner.os == 'Linux'
+        run: node --test test/n1b-https-cookie-invariants.test.mjs
+      - name: Validate Prisma schema and generate client offline
+        run: |
+          npx prisma validate
+          npx prisma generate
+      - name: Build protected Next 16 App Router with synthetic config
+        run: npm run build
+      - name: Confirm patched Babel in committed lockfile
+        run: node -e "const l=require('./package-lock.json'); if(l.packages['node_modules/@babel/core'].version!=='7.29.7')process.exit(1)"
+      - name: Report residual development advisories without waiving
+        run: node sandbox/n1b/audit-dev-advisories.mjs
+      - name: No npm advisories in production dependencies
+        run: npm audit --omit=dev --audit-level=low
+      - name: No high/critical advisories in full dependency tree
+        run: npm audit --audit-level=high
+  disposable-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: n1b_lab
+          POSTGRES_USER: n1b_lab
+          POSTGRES_PASSWORD: n1b_disposable_ci_only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U n1b_lab -d n1b_lab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://n1b_lab:n1b_disposable_ci_only@127.0.0.1:5432/n1b_lab?schema=public
+      N1B_ALLOW_EPHEMERAL_DB_TEST: 'yes'
+      AUTH_SECRET: synthetic-n1b-candidate-gate-key-do-not-use-production-2026
+      GOOGLE_CLIENT_ID: synthetic-google-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-google-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@lab.invalid
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - run: npx prisma generate
+      - name: Initialize PostgreSQL CI service only; no external database
+        run: npx prisma db push --skip-generate
+      - name: Build actual Next.js HTTP server
+        run: npm run build
+      - name: Real Prisma, Next Router, audit isolation and bootstrap tests
+        run: node --test test/n1b-ephemeral-postgres.test.mjs test/n1b-real-app-router-postgres-http.test.mjs test/n1b-controlled-bootstrap-postgres.test.mjs test/n1b-audit-postgres.test.mjs
+      - run: npm audit --omit=dev --audit-level=low
+      - run: npm audit --audit-level=high
