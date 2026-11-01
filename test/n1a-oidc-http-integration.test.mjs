@@ -58,7 +58,7 @@ async function newHarness() {
   const jwk=publicKey.export({format:'jwk'});
   Object.assign(jwk,{kid:'lab-key',alg:'RS256',use:'sig'});
   const codes=new Map();
-  const state={ email:ALLOWED,authCalls:0,tokenCalls:0,pkceOk:false,issuer:null,app:null };
+  const state={ email:ALLOWED,claimOverrides:{},authCalls:0,tokenCalls:0,pkceOk:false,issuer:null,app:null };
   const issuerServer=http.createServer(async(req,res)=>{
     const u=new URL(req.url,state.issuer);
     if(u.pathname==='/.well-known/openid-configuration')
@@ -93,7 +93,7 @@ async function newHarness() {
         return send(res,400,{error:'invalid_grant'});
       rec.used=true;state.pkceOk=true;
       return send(res,200,{access_token:'synthetic-access-token',token_type:'Bearer',expires_in:300,
-        id_token:createIdToken(privateKey,state.issuer,{email:state.email,nonce:rec.nonce})});
+        id_token:createIdToken(privateKey,state.issuer,{email:state.email,nonce:rec.nonce,...state.claimOverrides})});
     }
     send(res,404,{error:'not_found'});
   });
@@ -207,5 +207,45 @@ test('T5 corrupted session token does not authenticate; malformed Bearer does no
     assert.equal(r.status,200);
     const body=await r.json();
     assert.equal(body.user,undefined);
+  }finally{await h.close();}
+});
+
+test('T3 callback replay does not exchange authorization code twice',async()=>{
+  const h=await newHarness();
+  try{
+    const login=await signIn(h);
+    assert.equal((await login.session()).body.user?.email,ALLOWED);
+    assert.equal(h.state.tokenCalls,1);
+    const replay=await runHttp(login.callback.toString(),login.jar);
+    assert.ok([200,302,400].includes(replay.status));
+    assert.equal(h.state.tokenCalls,1,'reused callback must not invoke token endpoint a second time');
+  }finally{await h.close();}
+});
+test('T4 session and state cookies have HttpOnly and SameSite=Lax on localhost',async()=>{
+  const h=await newHarness();
+  try{
+    const login=await signIn(h);
+    assertCookieFlags(login.initiate.headers);
+    assertCookieFlags(login.callbackResponse.headers);
+    const cookieHeaders=login.callbackResponse.headers.getSetCookie();
+    assert.ok(cookieHeaders.some(c=>c.includes('session-token')));
+    assert.ok(cookieHeaders.every(c=>!/;\s*Secure/i.test(c)),'non-TLS loopback must not assert HTTPS Secure');
+  }finally{await h.close();}
+});
+test('T6 Unicode fullwidth-at email cannot impersonate bootstrap identity',async()=>{
+  const h=await newHarness();
+  h.state.email='bootstrap＠integration.invalid';
+  try{
+    const login=await signIn(h);
+    assert.equal((await login.session()).body.user,undefined);
+  }finally{await h.close();}
+});
+test('T7 invalid OIDC JWT audience is rejected before establishing a session',async()=>{
+  const h=await newHarness();
+  h.state.claimOverrides={aud:'different-synthetic-client'};
+  try{
+    const login=await signIn(h);
+    assert.equal(h.state.pkceOk,true);
+    assert.equal((await login.session()).body.user,undefined);
   }finally{await h.close();}
 });
