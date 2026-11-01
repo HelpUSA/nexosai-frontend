@@ -1,0 +1,40 @@
+name: N1-B Babel Safe Lockfile Repair (Draft Branch Only)
+on:
+  push:
+    branches: ['fix/n1b-babel-7-29-7-lab-20261101']
+permissions:
+  contents: write
+jobs:
+  regenerate-lockfile:
+    if: github.ref == 'refs/heads/fix/n1b-babel-7-29-7-lab-20261101'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Reconcile lockfile only with dependency script execution disabled
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Deterministic install from regenerated lockfile
+        run: npm ci --ignore-scripts --no-fund
+      - name: Verify patched Babel version
+        run: node -e "const l=require('./package-lock.json'); const v=l.packages['node_modules/@babel/core'].version; if(v!=='7.29.7')process.exit(1)"
+      - name: Run auth and authorization regression tests
+        run: node --test test/n1a-auth-env.test.mjs test/n1a-security-inventory.test.mjs test/n1a-oidc-http-integration.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1b-prisma-session-guard.test.mjs
+      - name: Require zero production npm advisories
+        run: npm audit --omit=dev --audit-level=low
+      - name: Require zero high/critical npm advisories
+        run: npm audit --audit-level=high
+      - name: Commit only package-lock.json to this private Draft branch
+        run: |
+          git config user.name "HelpUS LAB CI"
+          git config user.email "lab-ci@users.noreply.github.com"
+          git add package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(lockfile): pin patched Babel 7.29.7 for sandbox audit"
+            git push origin HEAD:refs/heads/fix/n1b-babel-7-29-7-lab-20261101
+          fi
