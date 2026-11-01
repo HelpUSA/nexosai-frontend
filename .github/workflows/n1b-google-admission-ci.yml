@@ -1,0 +1,45 @@
+name: NexosAI N1-B Verified Google Membership Admission LAB
+on:
+  push:
+    branches: ['feat/n1b-google-admission-lab-20261101']
+  pull_request:
+    branches: ['feat/n1b-ephemeral-postgres-pages-20261101']
+permissions:
+  contents: read
+jobs:
+  verified-google:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+        node: ['22','24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-only-verified-admission-secret-do-not-use-production-2026
+      GOOGLE_CLIENT_ID: synthetic-google-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-google-secret-credential
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@lab.invalid
+      DATABASE_URL: postgresql://invalid:invalid@127.0.0.1:9/nonexistent_test_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Verified Google profile and persisted membership guard tests
+        run: node --test test/n1b-google-admission.test.mjs
+      - name: Existing OIDC and tenant HTTP regressions
+        run: node --test test/n1a-auth-env.test.mjs test/n1a-security-inventory.test.mjs test/n1a-oidc-http-integration.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1b-prisma-session-guard.test.mjs
+      - name: Prisma offline schema/generate
+        run: |
+          npx prisma validate
+          npx prisma generate
+      - name: Next.js production build without live DB or credentials
+        run: npm run build
+      - name: Production dependency security gate
+        run: npm audit --omit=dev --audit-level=low
+      - name: High/critical security gate
+        run: npm audit --audit-level=high
