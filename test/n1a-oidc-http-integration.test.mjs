@@ -113,11 +113,23 @@ async function newHarness() {
     }],
     callbacks:{async signIn({user}){return Boolean(user.email && user.email.toLowerCase()===ALLOWED);}}
   };
-  const appServer=http.createServer((req,res)=>{
+  const appServer=http.createServer(async(req,res)=>{
     const parsed=new URL(req.url,'http://localhost');
     req.query=Object.fromEntries(parsed.searchParams);
     req.query.nextauth=parsed.pathname.split('/').filter(Boolean).slice(2);
-    // NextAuth v4 API implementation, not a mock auth decision.
+    req.cookies=Object.fromEntries((req.headers.cookie||'').split(';').filter(Boolean).map(v=>{
+      const i=v.indexOf('=');return [v.slice(0,i).trim(),decodeURIComponent(v.slice(i+1))];
+    }));
+    if(req.method==='POST'){
+      const chunks=[];for await(const chunk of req)chunks.push(chunk);
+      const body=Buffer.concat(chunks).toString('utf8');
+      req.body=Object.fromEntries(new URLSearchParams(body));
+    }
+    res.status=function(code){this.statusCode=code;return this;};
+    res.json=function(body){this.setHeader('content-type','application/json');this.end(JSON.stringify(body));return this;};
+    res.send=function(body){this.end(body);return this;};
+    res.redirect=function(url){this.statusCode=302;this.setHeader('location',url);this.end();return this;};
+    // NextAuth v4 uses NextApiRequest/NextApiResponse. This is an ephemeral adapter.
     Promise.resolve(NextAuth(req,res,options)).catch(e=>{
       console.error('SYNTHETIC_NEXTAUTH_HARNESS_ERROR',e?.name,e?.message);
       if(!res.headersSent)send(res,500,{error:'auth_handler_error'});
