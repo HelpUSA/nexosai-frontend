@@ -1,0 +1,43 @@
+name: N1-B Approved Bootstrap in Disposable PostgreSQL LAB
+on:
+  push:
+    branches: ['feat/n1b-google-admission-lab-20261101']
+  pull_request:
+    branches: ['feat/n1b-ephemeral-postgres-pages-20261101']
+permissions:
+  contents: read
+jobs:
+  bootstrap-disposable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: n1b_lab
+          POSTGRES_USER: n1b_lab
+          POSTGRES_PASSWORD: n1b_disposable_ci_only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U n1b_lab -d n1b_lab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://n1b_lab:n1b_disposable_ci_only@127.0.0.1:5432/n1b_lab?schema=public
+      N1B_ALLOW_EPHEMERAL_DB_TEST: 'yes'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - run: npx prisma generate
+      - name: Prepare disposable postgres service only
+        run: npx prisma db push --skip-generate
+      - name: Verify bootstrap admission in actual disposable database
+        run: node --test test/n1b-controlled-bootstrap-postgres.test.mjs
+      - run: npm audit --omit=dev --audit-level=low
+      - run: npm audit --audit-level=high
