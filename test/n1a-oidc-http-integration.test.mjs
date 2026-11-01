@@ -114,7 +114,9 @@ async function newHarness() {
     callbacks:{async signIn({user}){return Boolean(user.email && user.email.toLowerCase()===ALLOWED);}}
   };
   const appServer=http.createServer((req,res)=>{
-    req.query=Object.fromEntries(new URL(req.url,'http://localhost').searchParams);
+    const parsed=new URL(req.url,'http://localhost');
+    req.query=Object.fromEntries(parsed.searchParams);
+    req.query.nextauth=parsed.pathname.split('/').filter(Boolean).slice(2);
     // NextAuth v4 API implementation, not a mock auth decision.
     Promise.resolve(NextAuth(req,res,options)).catch(e=>{
       if(!res.headersSent)send(res,500,{error:'auth_handler_error'});
@@ -122,6 +124,7 @@ async function newHarness() {
     });
   });
   state.app=await listen(appServer);
+  process.env.NEXTAUTH_URL=state.app;
   return {state,issuerServer,appServer,async close(){await Promise.all([shutdown(appServer),shutdown(issuerServer)]);}};
 }
 async function signIn(h,{tamperState=false}={}){
