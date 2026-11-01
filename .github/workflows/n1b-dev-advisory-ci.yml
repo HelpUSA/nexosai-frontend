@@ -1,0 +1,29 @@
+name: NexosAI N1-B Dev Advisory Audit LAB
+on:
+  push:
+    branches: ['audit/n1b-dev-advisories-20261101']
+  pull_request:
+    branches: ['feat/n1b-server-middleware-lab-20261101']
+permissions:
+  contents: read
+jobs:
+  classify-dev-risk:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Classify exact remaining advisories without accepting them
+        run: node sandbox/n1b/audit-dev-advisories.mjs
+      - name: Mandatory zero known production advisories
+        run: npm audit --omit=dev --audit-level=low
+      - name: Mandatory high and critical full audit gate
+        run: npm audit --audit-level=high
