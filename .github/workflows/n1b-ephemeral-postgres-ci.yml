@@ -1,0 +1,52 @@
+name: N1-B Disposable PostgreSQL Integration (LAB ONLY)
+on:
+  push:
+    branches: ['feat/n1b-ephemeral-postgres-pages-20261101']
+  pull_request:
+    branches: ['audit/n1b-dev-advisories-20261101']
+permissions:
+  contents: read
+jobs:
+  ephemeral-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: n1b_lab
+          POSTGRES_USER: n1b_lab
+          POSTGRES_PASSWORD: n1b_disposable_ci_only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U n1b_lab -d n1b_lab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://n1b_lab:n1b_disposable_ci_only@127.0.0.1:5432/n1b_lab?schema=public
+      N1B_ALLOW_EPHEMERAL_DB_TEST: 'yes'
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@lab.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Prisma schema validate and generate without production database
+        run: |
+          npx prisma validate
+          npx prisma generate
+      - name: Initialize only ephemeral CI service DB (NEVER a real database)
+        run: npx prisma db push --skip-generate --accept-data-loss
+      - name: Real Prisma + ephemeral PostgreSQL tenant isolation tests
+        run: node --test test/n1b-ephemeral-postgres.test.mjs
+      - name: Existing authorization regression tests
+        run: node --test test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs
+      - run: npm audit --omit=dev --audit-level=low
+      - run: npm audit --audit-level=high
