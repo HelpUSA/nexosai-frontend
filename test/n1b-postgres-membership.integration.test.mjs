@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { authorizeNodeRead } from '../src/lib/tenant-access.mjs';
 import { provisionSuspendedMembership } from '../src/lib/membership-provision.mjs';
+import { authorizeScopedRead } from '../src/lib/tenant-resource-access.mjs';
 
 // Deliberately fails if somebody points this suite at a non-disposable database.
 const url = process.env.DATABASE_URL || '';
@@ -50,9 +51,25 @@ test('real PostgreSQL membership is request-scoped and deny-by-default', async (
     assert.equal((await query(aEmail,orgB.id,nodeB.id)).status,403, 'no foreign membership');
     assert.equal((await query(bEmail,orgA.id,nodeA.id)).status,403, 'second user unauthorized');
     assert.equal((await query(aEmail,orgA.id,'invalid/identifier')).status,404);
+    const agentA=await db.agent.create({data:{organizationId:orgA.id,name:'Agent A',systemPrompt:'PRIVATE PROMPT'}});
+    const convA=await db.conversation.create({data:{organizationId:orgA.id,title:'A Conversation'}});
+    const convB=await db.conversation.create({data:{organizationId:orgB.id,title:'B Conversation'}});
+    const msgA=await db.message.create({data:{conversationId:convA.id,content:'Private tenant A',role:'USER'}});
+    const msgB=await db.message.create({data:{conversationId:convB.id,content:'Private tenant B',role:'USER'}});
+    const scoped=(kind,resourceId,conversationId)=>authorizeScopedRead({email:aEmail,organizationId:orgA.id,kind,resourceId,conversationId,db});
+    const agentRead=await scoped('agent',agentA.id);
+    assert.equal(agentRead.status,200);
+    assert.equal('systemPrompt' in agentRead.resource,false,'server must not disclose private agent prompt');
+    assert.equal((await scoped('conversation',convA.id)).status,200);
+    assert.equal((await scoped('message',msgA.id,convA.id)).status,403,'VIEWER cannot read message content');
+    await db.organizationMembership.update({where:{userId_organizationId:{userId:userA.id,organizationId:orgA.id}},data:{role:'OPERATOR'}});
+    assert.equal((await scoped('message',msgA.id,convA.id)).status,200);
+    assert.equal((await scoped('message',msgB.id,convB.id)).status,404,'cross-tenant nested message hidden');
+    assert.equal((await scoped('message',msgA.id,convB.id)).status,404,'wrong parent hidden');
     await db.organizationMembership.update({
       where:{userId_organizationId:{userId:userA.id,organizationId:orgA.id}},data:{status:'REVOKED'}
     });
+    assert.equal((await scoped('message',msgA.id,convA.id)).status,403,'revocation blocks nested content');
     assert.equal((await query(aEmail,orgA.id,nodeA.id)).status,403, 'revocation effective immediately');
     await db.organizationMembership.update({
       where:{userId_organizationId:{userId:userA.id,organizationId:orgA.id}},data:{status:'ACTIVE',role:'VIEWER'}
