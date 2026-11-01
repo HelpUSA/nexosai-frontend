@@ -1,0 +1,35 @@
+name: NexosAI GoogleProvider Synthetic OIDC and HTTPS LAB
+on:
+  push:
+    branches: ['test/n1b-google-provider-https-20261101']
+  pull_request:
+    branches: ['feat/n1b-google-admission-lab-20261101']
+permissions:
+  contents: read
+jobs:
+  provider-and-tls:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+        node: ['22','24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Exercise real NextAuth v4 GoogleProvider against synthetic localhost IdP
+        run: node --test test/n1b-google-provider-oidc-http.test.mjs
+      - name: TLS self-signed loopback NextAuth secure cookie semantics
+        if: runner.os == 'Linux'
+        run: node --test test/n1b-https-cookie-invariants.test.mjs
+      - name: Full Google admission and original OIDC regression
+        run: node --test test/n1b-google-admission.test.mjs test/n1a-oidc-http-integration.test.mjs
+      - name: Production advisory gate
+        run: npm audit --omit=dev --audit-level=low
+      - name: Full high/critical advisory gate
+        run: npm audit --audit-level=high
