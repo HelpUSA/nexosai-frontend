@@ -127,7 +127,7 @@ async function newHarness() {
     }
     res.status=function(code){this.statusCode=code;return this;};
     res.json=function(body){this.setHeader('content-type','application/json');this.end(JSON.stringify(body));return this;};
-    res.send=function(body){this.end(body);return this;};
+    res.send=function(body){if(body!==null && typeof body==='object' && !Buffer.isBuffer(body)){this.setHeader('content-type','application/json');this.end(JSON.stringify(body));}else this.end(body);return this;};
     res.redirect=function(url){this.statusCode=302;this.setHeader('location',url);this.end();return this;};
     // NextAuth v4 uses NextApiRequest/NextApiResponse. This is an ephemeral adapter.
     Promise.resolve(NextAuth(req,res,options)).catch(e=>{
