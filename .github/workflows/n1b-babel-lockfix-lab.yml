@@ -1,0 +1,46 @@
+name: N1-B Babel Pinned Lock Audit (Read-Only)
+on:
+  push:
+    branches: ['fix/n1b-babel-7-29-7-lab-20261101']
+  pull_request:
+    branches: ['feat/n1b-ephemeral-postgres-pages-20261101']
+permissions:
+  contents: read
+jobs:
+  verify-locked-security-fix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+        node: ['22','24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-babel-repair-secret-not-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@lab.invalid
+      DATABASE_URL: postgresql://invalid:invalid@127.0.0.1:9/never_connect
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Immutable deterministic package installation
+        run: npm ci --ignore-scripts --no-fund
+      - name: Verify patched Babel version in committed lockfile
+        run: node -e "const l=require('./package-lock.json'); if(l.packages['node_modules/@babel/core'].version!=='7.29.7')process.exit(1)"
+      - name: Authentication, authorization and inventory regressions
+        run: node --test test/n1a-auth-env.test.mjs test/n1a-security-inventory.test.mjs test/n1a-oidc-http-integration.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1b-prisma-session-guard.test.mjs
+      - name: Prisma generate without database connection
+        run: npx prisma generate
+      - name: Verify Next.js compatibility
+        run: npm run build
+      - name: Reject all known production npm advisories
+        run: npm audit --omit=dev --audit-level=low
+      - name: Reject high and critical full-tree advisories
+        run: npm audit --audit-level=high
