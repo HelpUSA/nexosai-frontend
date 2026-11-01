@@ -46,6 +46,10 @@ jobs:
         run: npx prisma db push --skip-generate --accept-data-loss
       - name: Real Prisma + ephemeral PostgreSQL tenant isolation tests
         run: node --test test/n1b-ephemeral-postgres.test.mjs
+      - name: Build Next.js production server with synthetic-only credentials
+        run: npm run build
+      - name: Exercise actual App Router HTTP using signed synthetic NextAuth cookie and disposable DB
+        run: node --test test/n1b-real-app-router-postgres-http.test.mjs
       - name: Existing authorization regression tests
         run: node --test test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs
       - run: npm audit --omit=dev --audit-level=low
