@@ -54,6 +54,7 @@ test('real PostgreSQL membership is request-scoped and deny-by-default', async (
     });
     assert.equal((await query(aEmail,orgA.id,nodeA.id)).status,403, 'membership deletion effective immediately');
   } finally {
+    await db.node.deleteMany({where:{organizationId:{in:[orgA.id,orgB.id]}}});
     await db.organization.deleteMany({where:{id:{in:[orgA.id,orgB.id]}}});
     await db.user.deleteMany({where:{id:{in:[userA.id,userB.id]}}});
     await db.$disconnect();
