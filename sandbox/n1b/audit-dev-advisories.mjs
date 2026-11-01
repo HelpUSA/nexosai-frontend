@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 
 function audit(args){
   const result=spawnSync('npm',['audit','--json',...args],{encoding:'utf8',timeout:120000,
-    env:{...process.env,npm_config_fund:'false'}});
+    env:{...process.env,npm_config_fund:'false'},shell:process.platform==='win32'});
   if(result.error)throw result.error;
   if(!result.stdout.trim())throw Error('npm audit did not return JSON');
   let doc;
