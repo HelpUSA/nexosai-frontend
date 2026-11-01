@@ -119,6 +119,7 @@ async function newHarness() {
     req.query.nextauth=parsed.pathname.split('/').filter(Boolean).slice(2);
     // NextAuth v4 API implementation, not a mock auth decision.
     Promise.resolve(NextAuth(req,res,options)).catch(e=>{
+      console.error('SYNTHETIC_NEXTAUTH_HARNESS_ERROR',e?.name,e?.message);
       if(!res.headersSent)send(res,500,{error:'auth_handler_error'});
       else res.end();
     });
