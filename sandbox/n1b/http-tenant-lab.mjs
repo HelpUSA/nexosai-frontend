@@ -45,6 +45,10 @@ export function makeLabHandler(db=createLabData()) {
       const [,orgId,kind,id,messageId]=match;
       if(!['GET','PATCH'].includes(req.method))return send(res,405,'METHOD_NOT_ALLOWED');
       if(messageId && kind!=='conversations')return send(res,404,'NOT_FOUND');
+      // NextAuth v4 expects NextApiRequest-style parsed cookies; Node IncomingMessage has only headers.
+      req.cookies=Object.fromEntries((req.headers.cookie||'').split(';').filter(Boolean).map(part=>{
+        const i=part.indexOf('=');return [part.slice(0,i).trim(),decodeURIComponent(part.slice(i+1))];
+      }));
       // NextAuth verifies JWT/JWE from the cookie. No user-id or role comes from request headers.
       const token=await getToken({req,secret:SECRET,secureCookie:false});
       if(process.env.N1B_LAB_DEBUG==='1')console.error('N1B_JWT_PROBE',Boolean(token),Object.keys(req.headers),req.headers.cookie?.split('=')[0]);
