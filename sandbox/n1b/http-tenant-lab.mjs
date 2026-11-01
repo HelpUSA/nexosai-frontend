@@ -51,7 +51,6 @@ export function makeLabHandler(db=createLabData()) {
       }));
       // NextAuth verifies JWT/JWE from the cookie. No user-id or role comes from request headers.
       const token=await getToken({req,secret:SECRET,secureCookie:false});
-      if(process.env.N1B_LAB_DEBUG==='1')console.error('N1B_JWT_PROBE',Boolean(token),Object.keys(req.headers),req.headers.cookie?.split('=')[0]);
       if(!token || typeof token.sub!=='string' || !token.sub)return send(res,401,'UNAUTHENTICATED');
       const userId=token.sub;
       const membership=db.memberships.get(userId+':'+orgId);
@@ -67,7 +66,6 @@ export function makeLabHandler(db=createLabData()) {
       if(!result.ok)return send(res,result.status,result.code);
       return send(res,200,'AUTHORIZED');
     }catch(e){
-      if(process.env.N1B_LAB_DEBUG==='1')console.error('N1B_LAB_ERROR',e?.name,e?.message);
       // Fail closed; do not echo JWTs, cookie values or stack traces to clients.
       return send(res,401,'UNAUTHENTICATED');
     }
