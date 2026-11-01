@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { authorizeNodeRead } from '../src/lib/tenant-access.mjs';
+import { provisionSuspendedMembership } from '../src/lib/membership-provision.mjs';
 
 // Deliberately fails if somebody points this suite at a non-disposable database.
 const url = process.env.DATABASE_URL || '';
@@ -23,6 +24,13 @@ test('real PostgreSQL membership is request-scoped and deny-by-default', async (
   const userA = await db.user.create({ data: { email: aEmail } });
   const userB = await db.user.create({ data: { email: bEmail } });
   try {
+    const provisioned = await provisionSuspendedMembership({verifiedEmail:bEmail,organizationId:orgB.id,db});
+    assert.equal(provisioned.ok,true);
+    assert.equal(provisioned.membership.status,'SUSPENDED');
+    assert.equal(provisioned.membership.role,'VIEWER');
+    assert.equal((await provisionSuspendedMembership({verifiedEmail:bEmail,organizationId:orgB.id,db})).membership.status,'SUSPENDED');
+    await db.organizationMembership.update({where:{userId_organizationId:{userId:userB.id,organizationId:orgB.id}},data:{status:'REVOKED'}});
+    assert.equal((await provisionSuspendedMembership({verifiedEmail:bEmail,organizationId:orgB.id,db})).membership.status,'REVOKED');
     const nodeA = await db.node.create({data:{organizationId:orgA.id,name:'Scoped Node A'}});
     const nodeB = await db.node.create({data:{organizationId:orgB.id,name:'Private Node B'}});
     const query = (email,organizationId,nodeId) => authorizeNodeRead({email,organizationId,nodeId,db});
