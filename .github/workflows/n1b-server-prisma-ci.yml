@@ -1,0 +1,45 @@
+name: NexosAI N1-B App Router Prisma Guard Draft Gate
+on:
+  push:
+    branches: ['feat/n1b-server-middleware-lab-20261101']
+  pull_request:
+    branches: ['test/n1b-http-tenant-enforcement-20261101']
+permissions:
+  contents: read
+jobs:
+  server-authz:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-2025]
+        node: ['22','24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      DATABASE_URL: postgresql://invalid:invalid@127.0.0.1:9/synthetic_never_connect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Scoped Prisma session guard unit tests with mocked storage
+        run: node --test test/n1b-prisma-session-guard.test.mjs
+      - name: OIDC and HTTP synthetic tenant regression
+        run: node --test test/n1b-http-tenant-guards.test.mjs test/n1a-oidc-http-integration.test.mjs
+      - name: Prisma schema validation and client generation (no DB access)
+        run: |
+          npx prisma validate
+          npx prisma generate
+      - name: Next.js build with synthetic environment only
+        run: npm run build
+      - name: Reject any known production advisories
+        run: npm audit --omit=dev --audit-level=low
+      - name: Reject high/critical in full tree
+        run: npm audit --audit-level=high
