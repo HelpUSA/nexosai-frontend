@@ -26,6 +26,10 @@ jobs:
       DATABASE_URL: postgresql://nexosai_test:local_ci_only@127.0.0.1:5432/nexosai_g3c_test
       G3C_EPHEMERAL_POSTGRES: 'YES'
       NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,6 +44,7 @@ jobs:
       - name: Postgres authorization integration
         run: node --test test/n1b-postgres-membership.integration.test.mjs
       - name: Existing unit and OIDC HTTP regression
-        run: node --test test/n1b-provisioning-policy.test.mjs test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1a-oidc-http-integration.test.mjs
+        run: node --test test/n1b-scoped-resources.test.mjs test/n1b-provisioning-policy.test.mjs test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1a-oidc-http-integration.test.mjs
+      - run: npm run build
       - run: npm audit --omit=dev --audit-level=low
       - run: npm audit --audit-level=high
