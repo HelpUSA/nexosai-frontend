@@ -40,6 +40,6 @@ jobs:
       - name: Postgres authorization integration
         run: node --test test/n1b-postgres-membership.integration.test.mjs
       - name: Existing unit and OIDC HTTP regression
-        run: node --test test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1a-oidc-http-integration.test.mjs
+        run: node --test test/n1b-provisioning-policy.test.mjs test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1a-oidc-http-integration.test.mjs
       - run: npm audit --omit=dev --audit-level=low
       - run: npm audit --audit-level=high
