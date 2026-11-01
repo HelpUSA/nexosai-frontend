@@ -24,8 +24,6 @@ jobs:
       - name: Deterministic clean installation
         run: npm ci --ignore-scripts --no-fund
       - name: HTTP authorization and NextAuth JWT integration lab
-        env:
-          N1B_LAB_DEBUG: '1'
         run: node --test test/n1b-http-tenant-guards.test.mjs
       - name: OIDC handler integration regression
         run: node --test test/n1a-oidc-http-integration.test.mjs
