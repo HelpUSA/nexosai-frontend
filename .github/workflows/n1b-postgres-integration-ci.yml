@@ -1,9 +1,14 @@
 name: NexosAI G3C PostgreSQL Membership Integration LAB
 on:
   push:
-    branches: ['test/g3c-postgres-integration-20261101']
+    branches:
+      - 'test/g3c-postgres-integration-20261101'
+      - 'test/g3c-order038-gaps-closure-20261101'
   pull_request:
-    branches: ['audit/n1b-dev-advisories-20261101']
+    branches:
+      - 'audit/n1b-dev-advisories-20261101'
+      - 'test/g3c-postgres-integration-20261101'
+      - 'main'
 permissions:
   contents: read
 jobs:
@@ -50,5 +55,7 @@ jobs:
         run: node test/n1b-next-http-unauth.smoke.mjs
       - name: NextAuth runtime must fail closed when all login secrets are missing
         run: node test/n1a-next-http-missing-secrets.smoke.mjs
+      - name: Authenticated HTTP session enforcement and edge middleware redirect
+        run: node test/n1b-next-http-auth.integration.test.mjs
       - run: npm audit --omit=dev --audit-level=low
       - run: npm audit --audit-level=high
