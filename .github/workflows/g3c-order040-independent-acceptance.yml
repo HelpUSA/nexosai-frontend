@@ -1,0 +1,21 @@
+name: G3C Independent Order 040 Acceptance (Draft)
+on:
+  push:
+    branches:
+      - 'test/g3c-order040-independent-contracts-20261102'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acceptance-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Strict G3C acceptance contract (red until Order 040 fixes)
+        run: node --test test/n1b-order040-independent-acceptance.test.mjs
