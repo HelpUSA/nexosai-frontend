@@ -48,5 +48,7 @@ jobs:
       - run: npm run build
       - name: Actual Next.js unauthenticated route smoke (no real identity)
         run: node test/n1b-next-http-unauth.smoke.mjs
+      - name: NextAuth runtime must fail closed when all login secrets are missing
+        run: node test/n1a-next-http-missing-secrets.smoke.mjs
       - run: npm audit --omit=dev --audit-level=low
       - run: npm audit --audit-level=high
