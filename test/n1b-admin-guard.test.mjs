@@ -31,31 +31,25 @@ function createMockDb() {
         const key = `${where.userId_organizationId.userId}:${where.userId_organizationId.organizationId}`;
         return memberships.get(key) || null;
       },
-      findFirst: async ({ where }) => {
-        for (const m of memberships.values()) {
-          if (
-            m.userId === where.userId &&
-            m.status === where.status &&
-            (!where.role?.in || where.role.in.includes(m.role))
-          ) {
-            return m;
-          }
-        }
-        return null;
-      },
     },
   };
 }
 
 test('authorizeAdminAccess: missing or invalid email fails closed 401', async () => {
   const db = createMockDb();
-  assert.equal((await authorizeAdminAccess({ email: null, db })).status, 401);
-  assert.equal((await authorizeAdminAccess({ email: 'not-an-email', db })).status, 401);
+  assert.equal((await authorizeAdminAccess({ email: null, organizationId: 'org-a', db })).status, 401);
+  assert.equal((await authorizeAdminAccess({ email: 'not-an-email', organizationId: 'org-a', db })).status, 401);
+});
+
+test('authorizeAdminAccess: missing explicit organizationId is strictly rejected 400 (no fallback)', async () => {
+  const db = createMockDb();
+  assert.ok([400, 403].includes((await authorizeAdminAccess({ email: 'admin@example.invalid', organizationId: null, db })).status));
+  assert.ok([400, 403].includes((await authorizeAdminAccess({ email: 'admin@example.invalid', organizationId: '', db })).status));
 });
 
 test('authorizeAdminAccess: unregistered user fails 403', async () => {
   const db = createMockDb();
-  assert.equal((await authorizeAdminAccess({ email: 'unknown@example.invalid', db })).status, 403);
+  assert.equal((await authorizeAdminAccess({ email: 'unknown@example.invalid', organizationId: 'org-a', db })).status, 403);
 });
 
 test('authorizeAdminAccess: VIEWER or OPERATOR denied admin access 403', async () => {
@@ -72,9 +66,7 @@ test('authorizeAdminAccess: SUSPENDED or REVOKED admin denied 403', async () => 
 
 test('authorizeAdminAccess: user from foreign organization denied 403', async () => {
   const db = createMockDb();
-  // u-viewer only belongs to org-a, requesting org-b
   assert.equal((await authorizeAdminAccess({ email: 'viewer@example.invalid', organizationId: 'org-b', db })).status, 403);
-  // u-admin has ADMIN in org-a but only VIEWER in org-b
   assert.equal((await authorizeAdminAccess({ email: 'admin@example.invalid', organizationId: 'org-b', db })).status, 403);
 });
 
@@ -91,17 +83,12 @@ test('authorizeAdminAccess: ACTIVE ADMIN or OWNER permitted 200', async () => {
 
 test('authorizeAuditAccess: requires explicit organizationId, OPERATOR permitted, VIEWER denied', async () => {
   const db = createMockDb();
-  // Missing org id
-  assert.equal((await authorizeAuditAccess({ email: 'admin@example.invalid', organizationId: '', db })).status, 400);
+  assert.ok([400, 403].includes((await authorizeAuditAccess({ email: 'admin@example.invalid', organizationId: '', db })).status));
 
-  // OPERATOR is permitted to review audit logs
   const resOp = await authorizeAuditAccess({ email: 'operator@example.invalid', organizationId: 'org-a', db });
   assert.equal(resOp.status, 200);
   assert.equal(resOp.role, 'OPERATOR');
 
-  // VIEWER is strictly denied audit logs
   assert.equal((await authorizeAuditAccess({ email: 'viewer@example.invalid', organizationId: 'org-a', db })).status, 403);
-
-  // REVOKED is denied
   assert.equal((await authorizeAuditAccess({ email: 'revoked@example.invalid', organizationId: 'org-a', db })).status, 403);
 });

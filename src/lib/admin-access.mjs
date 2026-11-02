@@ -1,5 +1,5 @@
 // Admin page and mutation authorization helper.
-// Caller MUST supply verified email from NextAuth session.
+// Caller MUST supply verified email from NextAuth session and explicit organizationId.
 const EMAIL = /^[a-z0-9.!#$%&'*+/=?^_{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 const ID = /^[A-Za-z0-9_-]{1,100}$/;
 
@@ -10,7 +10,11 @@ export async function authorizeAdminAccess({ email, organizationId, db }) {
   const canonical = email.trim().toLowerCase();
   if (!EMAIL.test(canonical)) return fail(401, 'UNAUTHENTICATED');
 
-  if (!db?.user?.findUnique || !db?.organizationMembership) {
+  // Enforce explicit organizationId; no fallback to findFirst across other organizations
+  if (!organizationId) return fail(400, 'ORGANIZATION_ID_REQUIRED');
+  if (!ID.test(organizationId)) return fail(404, 'NOT_FOUND');
+
+  if (!db?.user?.findUnique || !db?.organizationMembership?.findUnique) {
     return fail(503, 'AUTHZ_STORAGE_UNAVAILABLE');
   }
 
@@ -21,44 +25,16 @@ export async function authorizeAdminAccess({ email, organizationId, db }) {
     });
     if (!user?.id) return fail(403, 'ADMIN_ACCESS_REQUIRED');
 
-    // If an organizationId is specified, verify that the user has an ACTIVE ADMIN/OWNER role in that org.
-    if (organizationId) {
-      if (!ID.test(organizationId)) return fail(404, 'NOT_FOUND');
-
-      const membership = await db.organizationMembership.findUnique({
-        where: { userId_organizationId: { userId: user.id, organizationId } },
-        select: { userId: true, organizationId: true, role: true, status: true },
-      });
-
-      if (
-        !membership ||
-        membership.status !== 'ACTIVE' ||
-        !['ADMIN', 'OWNER'].includes(membership.role)
-      ) {
-        return fail(403, 'ADMIN_ACCESS_REQUIRED');
-      }
-
-      return {
-        ok: true,
-        status: 200,
-        code: 'AUTHORIZED',
-        user,
-        organizationId,
-        role: membership.role,
-      };
-    }
-
-    // If no organizationId is specified, verify if user has at least one ACTIVE ADMIN/OWNER membership anywhere.
-    const activeAdminMembership = await db.organizationMembership.findFirst({
-      where: {
-        userId: user.id,
-        status: 'ACTIVE',
-        role: { in: ['ADMIN', 'OWNER'] },
-      },
-      select: { organizationId: true, role: true },
+    const membership = await db.organizationMembership.findUnique({
+      where: { userId_organizationId: { userId: user.id, organizationId } },
+      select: { userId: true, organizationId: true, role: true, status: true },
     });
 
-    if (!activeAdminMembership) {
+    if (
+      !membership ||
+      membership.status !== 'ACTIVE' ||
+      !['ADMIN', 'OWNER'].includes(membership.role)
+    ) {
       return fail(403, 'ADMIN_ACCESS_REQUIRED');
     }
 
@@ -67,8 +43,8 @@ export async function authorizeAdminAccess({ email, organizationId, db }) {
       status: 200,
       code: 'AUTHORIZED',
       user,
-      organizationId: activeAdminMembership.organizationId,
-      role: activeAdminMembership.role,
+      organizationId,
+      role: membership.role,
     };
   } catch {
     return fail(503, 'AUTHZ_STORAGE_UNAVAILABLE');
@@ -79,9 +55,10 @@ export async function authorizeAuditAccess({ email, organizationId, db }) {
   if (typeof email !== 'string') return fail(401, 'UNAUTHENTICATED');
   const canonical = email.trim().toLowerCase();
   if (!EMAIL.test(canonical)) return fail(401, 'UNAUTHENTICATED');
-  if (!organizationId || !ID.test(organizationId)) return fail(400, 'ORGANIZATION_ID_REQUIRED');
+  if (!organizationId) return fail(400, 'ORGANIZATION_ID_REQUIRED');
+  if (!ID.test(organizationId)) return fail(404, 'NOT_FOUND');
 
-  if (!db?.user?.findUnique || !db?.organizationMembership) {
+  if (!db?.user?.findUnique || !db?.organizationMembership?.findUnique) {
     return fail(503, 'AUTHZ_STORAGE_UNAVAILABLE');
   }
 

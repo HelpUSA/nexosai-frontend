@@ -5,9 +5,35 @@ import { randomUUID } from 'node:crypto';
 import { encode } from 'next-auth/jwt';
 import { PrismaClient } from '@prisma/client';
 
-// Verifies real App Router HTTP session enforcement, edge middleware redirect,
-// tamper-resistance, and real PostgreSQL authenticated RBAC isolation.
-const secret = process.env.AUTH_SECRET || 'synthetic-ci-only-signing-value-not-valid-for-deployment-2026';
+// FAIL-HARD VALIDATIONS: Refuse to execute or skip silently.
+if (process.env.G3C_EPHEMERAL_POSTGRES !== 'YES') {
+  throw new Error('FAIL_HARD: G3C_EPHEMERAL_POSTGRES must be set to "YES" to run integration suite');
+}
+
+const dbUrl = process.env.DATABASE_URL || '';
+const parsed = (() => {
+  try {
+    return new URL(dbUrl);
+  } catch {
+    return null;
+  }
+})();
+
+if (
+  !parsed ||
+  !['127.0.0.1', 'localhost'].includes(parsed.hostname) ||
+  parsed.pathname !== '/nexosai_g3c_test'
+) {
+  throw new Error(
+    `FAIL_HARD: Refusing non-ephemeral database: require localhost/nexosai_g3c_test (got: ${dbUrl})`
+  );
+}
+
+const secret = process.env.AUTH_SECRET;
+if (!secret || secret.length < 32) {
+  throw new Error('FAIL_HARD: AUTH_SECRET must be supplied and at least 32 characters');
+}
+
 const port = 3105;
 const host = `http://127.0.0.1:${port}`;
 
@@ -27,8 +53,17 @@ const env = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || 'synthetic-oauth-id.apps.invalid',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || 'synthetic-oauth-client-secret',
   NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: process.env.NEXOSAI_BOOTSTRAP_ADMIN_EMAIL || 'bootstrap@example.invalid',
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://nexosai_test:local_ci_only@127.0.0.1:5432/nexosai_g3c_test',
+  DATABASE_URL: dbUrl,
 };
+
+// Connect directly to ensure database is live before starting Next.js
+const db = new PrismaClient();
+try {
+  await db.$connect();
+  console.log('FAIL_HARD_CHECK: PostgreSQL ephemeral connection validated successfully.');
+} catch (err) {
+  throw new Error(`FAIL_HARD: Failed to connect to ephemeral database at ${dbUrl}: ${err.message}`);
+}
 
 const child = spawn(
   process.execPath,
@@ -41,7 +76,6 @@ child.stderr.on('data', (b) => {
   errorText = (errorText + String(b)).slice(-1000);
 });
 
-let db = null;
 let cleanupFn = null;
 
 try {
@@ -59,34 +93,28 @@ try {
   }
   assert.equal(ready, true, `Next.js startup failed: ${errorText}`);
 
-  // Test 1: Unauthenticated request to /admin is redirected to /login at edge middleware
+  // Test 1: Edge redirects for unauthenticated requests
   const adminUnauth = await fetch(`${host}/admin`, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
   assert.equal(adminUnauth.status, 307, 'Unauthenticated /admin must redirect 307');
   assert.match(adminUnauth.headers.get('location') || '', /\/login\?callbackUrl=%2Fadmin/);
-  console.log('PASS: Unauthenticated /admin correctly redirected to /login');
 
-  // Test 2: Unauthenticated request to /dashboard is redirected to /login
   const dashUnauth = await fetch(`${host}/dashboard`, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
   assert.equal(dashUnauth.status, 307, 'Unauthenticated /dashboard must redirect 307');
   assert.match(dashUnauth.headers.get('location') || '', /\/login\?callbackUrl=%2Fdashboard/);
-  console.log('PASS: Unauthenticated /dashboard correctly redirected to /login');
 
-  // Test 3: Unauthenticated request to /audit is redirected to /login
   const auditUnauth = await fetch(`${host}/audit`, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
   assert.equal(auditUnauth.status, 307, 'Unauthenticated /audit must redirect 307');
   assert.match(auditUnauth.headers.get('location') || '', /\/login\?callbackUrl=%2Faudit/);
-  console.log('PASS: Unauthenticated /audit correctly redirected to /login');
+  console.log('VERIFIED_CASE_1: Unauthenticated edge redirects (3/3 passed)');
 
-  // Test 4: Tampered cookie to API endpoints rejected 401
+  // Test 2: Tampered and foreign cookies fail closed 401
   const badCookie = 'next-auth.session-token=malformed-tampered-jwe-token';
   const apiTampered = await fetch(`${host}/api/orgs/org-a/nodes/node-a`, {
     headers: { cookie: badCookie },
     signal: AbortSignal.timeout(5000),
   });
   assert.equal(apiTampered.status, 401, 'Tampered cookie must fail closed 401');
-  console.log('PASS: Tampered cookie on API endpoint rejected 401');
 
-  // Test 5: Cookie signed with wrong key rejected 401
   const foreignToken = await encode({
     secret: 'different-signing-secret-that-is-at-least-32-chars-long',
     token: { sub: 'attacker@example.invalid', email: 'attacker@example.invalid' },
@@ -97,186 +125,169 @@ try {
     signal: AbortSignal.timeout(5000),
   });
   assert.equal(apiForeign.status, 401, 'Foreign-signed cookie must fail closed 401');
-  console.log('PASS: Foreign-signed cookie rejected 401');
+  console.log('VERIFIED_CASE_2: Tampered/Foreign tokens reject 401 (2/2 passed)');
 
-  // Test 6: Real PostgreSQL Authenticated Multi-Tenant & RBAC Integration
-  if (process.env.G3C_EPHEMERAL_POSTGRES === 'YES') {
-    db = new PrismaClient();
-    const canConnect = await db.$connect().then(() => true).catch(() => false);
+  // Test 3: PostgreSQL Seed and Multi-Tenant RBAC Validation
+  const suffix = randomUUID().replaceAll('-', '').slice(0, 8);
+  const orgAId = `org-a-${suffix}`;
+  const orgBId = `org-b-${suffix}`;
+  const adminAEmail = `admin-a-${suffix}@example.invalid`;
+  const viewerAEmail = `viewer-a-${suffix}@example.invalid`;
+  const userBEmail = `user-b-${suffix}@example.invalid`;
 
-    if (canConnect) {
-      console.log('PostgreSQL connection established for real HTTP RBAC verification.');
-      const suffix = randomUUID().replaceAll('-', '').slice(0, 8);
-      const orgAId = `org-a-${suffix}`;
-      const orgBId = `org-b-${suffix}`;
-      const adminAEmail = `admin-a-${suffix}@example.invalid`;
-      const viewerAEmail = `viewer-a-${suffix}@example.invalid`;
-      const userBEmail = `user-b-${suffix}@example.invalid`;
+  const orgA = await db.organization.create({ data: { id: orgAId, name: 'Org A E2E', slug: `org-a-${suffix}` } });
+  const orgB = await db.organization.create({ data: { id: orgBId, name: 'Org B E2E', slug: `org-b-${suffix}` } });
+  const userAdminA = await db.user.create({ data: { email: adminAEmail } });
+  const userViewerA = await db.user.create({ data: { email: viewerAEmail } });
+  const userB = await db.user.create({ data: { email: userBEmail } });
 
-      const orgA = await db.organization.create({ data: { id: orgAId, name: 'Org A E2E', slug: `org-a-${suffix}` } });
-      const orgB = await db.organization.create({ data: { id: orgBId, name: 'Org B E2E', slug: `org-b-${suffix}` } });
-      const userAdminA = await db.user.create({ data: { email: adminAEmail } });
-      const userViewerA = await db.user.create({ data: { email: viewerAEmail } });
-      const userB = await db.user.create({ data: { email: userBEmail } });
+  await db.organizationMembership.create({
+    data: { userId: userAdminA.id, organizationId: orgA.id, role: 'ADMIN', status: 'ACTIVE' },
+  });
+  await db.organizationMembership.create({
+    data: { userId: userViewerA.id, organizationId: orgA.id, role: 'VIEWER', status: 'ACTIVE' },
+  });
+  await db.organizationMembership.create({
+    data: { userId: userB.id, organizationId: orgB.id, role: 'ADMIN', status: 'ACTIVE' },
+  });
 
-      await db.organizationMembership.create({
-        data: { userId: userAdminA.id, organizationId: orgA.id, role: 'ADMIN', status: 'ACTIVE' },
-      });
-      await db.organizationMembership.create({
-        data: { userId: userViewerA.id, organizationId: orgA.id, role: 'VIEWER', status: 'ACTIVE' },
-      });
-      await db.organizationMembership.create({
-        data: { userId: userB.id, organizationId: orgB.id, role: 'ADMIN', status: 'ACTIVE' },
-      });
+  const nodeA = await db.node.create({ data: { organizationId: orgA.id, name: 'Node E2E A' } });
+  const nodeB = await db.node.create({ data: { organizationId: orgB.id, name: 'Node E2E B' } });
+  const agentA = await db.agent.create({
+    data: { organizationId: orgA.id, name: 'Agent E2E A', systemPrompt: 'TOP_SECRET_PROMPT' },
+  });
+  const convA = await db.conversation.create({ data: { organizationId: orgA.id, title: 'Conv E2E A' } });
+  const msgA = await db.message.create({ data: { conversationId: convA.id, content: 'Private message', role: 'USER' } });
 
-      const nodeA = await db.node.create({ data: { organizationId: orgA.id, name: 'Node E2E A' } });
-      const nodeB = await db.node.create({ data: { organizationId: orgB.id, name: 'Node E2E B' } });
-      const agentA = await db.agent.create({
-        data: { organizationId: orgA.id, name: 'Agent E2E A', systemPrompt: 'TOP_SECRET_PROMPT' },
-      });
-      const convA = await db.conversation.create({ data: { organizationId: orgA.id, title: 'Conv E2E A' } });
-      const msgA = await db.message.create({ data: { conversationId: convA.id, content: 'Private message', role: 'USER' } });
+  cleanupFn = async () => {
+    try {
+      await db.message.deleteMany({ where: { conversationId: convA.id } });
+      await db.conversation.deleteMany({ where: { organizationId: orgA.id } });
+      await db.agent.deleteMany({ where: { organizationId: orgA.id } });
+      await db.node.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
+      await db.organizationMembership.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
+      await db.organization.deleteMany({ where: { id: { in: [orgA.id, orgB.id] } } });
+      await db.user.deleteMany({ where: { id: { in: [userAdminA.id, userViewerA.id, userB.id] } } });
+    } catch {}
+  };
 
-      cleanupFn = async () => {
-        try {
-          await db.message.deleteMany({ where: { conversationId: convA.id } });
-          await db.conversation.deleteMany({ where: { organizationId: orgA.id } });
-          await db.agent.deleteMany({ where: { organizationId: orgA.id } });
-          await db.node.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-          await db.organizationMembership.deleteMany({ where: { organizationId: { in: [orgA.id, orgB.id] } } });
-          await db.organization.deleteMany({ where: { id: { in: [orgA.id, orgB.id] } } });
-          await db.user.deleteMany({ where: { id: { in: [userAdminA.id, userViewerA.id, userB.id] } } });
-        } catch {}
-      };
+  const cookieAdminA = await makeCookie(adminAEmail);
+  const cookieViewerA = await makeCookie(viewerAEmail);
 
-      const cookieAdminA = await makeCookie(adminAEmail);
-      const cookieViewerA = await makeCookie(viewerAEmail);
+  // 3.1: Active Admin A reads own node -> 200
+  const nodeRes = await fetch(`${host}/api/orgs/${orgA.id}/nodes/${nodeA.id}`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(nodeRes.status, 200);
+  const nodeBody = await nodeRes.json();
+  assert.equal(nodeBody.node.id, nodeA.id);
 
-      // 6.1: Active Admin A reads own node 200
-      const nodeRes = await fetch(`${host}/api/orgs/${orgA.id}/nodes/${nodeA.id}`, {
-        headers: { cookie: cookieAdminA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(nodeRes.status, 200);
-      const nodeBody = await nodeRes.json();
-      assert.equal(nodeBody.node.id, nodeA.id);
-      console.log('PASS: HTTP GET /nodes own node returns 200');
+  // 3.2: Cross-tenant node query is concealed -> 404
+  const crossNodeRes = await fetch(`${host}/api/orgs/${orgA.id}/nodes/${nodeB.id}`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(crossNodeRes.status, 404, 'Cross-tenant resource must be concealed 404');
 
-      // 6.2: Cross-tenant node query is concealed 404
-      const crossNodeRes = await fetch(`${host}/api/orgs/${orgA.id}/nodes/${nodeB.id}`, {
-        headers: { cookie: cookieAdminA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(crossNodeRes.status, 404, 'Cross-tenant resource must be concealed 404');
-      console.log('PASS: Cross-tenant node request concealed 404');
+  // 3.3: Foreign org without membership -> 403
+  const foreignOrgRes = await fetch(`${host}/api/orgs/${orgB.id}/nodes/${nodeB.id}`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(foreignOrgRes.status, 403, 'Foreign tenant request must fail 403');
+  console.log('VERIFIED_CASE_3: Postgres Node Isolation (3/3 passed)');
 
-      // 6.3: Foreign org without membership returns 403
-      const foreignOrgRes = await fetch(`${host}/api/orgs/${orgB.id}/nodes/${nodeB.id}`, {
-        headers: { cookie: cookieAdminA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(foreignOrgRes.status, 403, 'Foreign tenant request must fail 403');
-      console.log('PASS: Foreign organization node request denied 403');
+  // 3.4: Active Viewer reads agent; systemPrompt MUST NOT be disclosed
+  const agentRes = await fetch(`${host}/api/orgs/${orgA.id}/agents/${agentA.id}`, {
+    headers: { cookie: cookieViewerA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(agentRes.status, 200);
+  const agentBody = await agentRes.json();
+  assert.equal('systemPrompt' in agentBody.agent, false, 'systemPrompt must never be disclosed to viewer');
+  console.log('VERIFIED_CASE_4: Postgres Agent Isolation & systemPrompt suppression (1/1 passed)');
 
-      // 6.4: Active Viewer reads agent; systemPrompt MUST NOT be disclosed
-      const agentRes = await fetch(`${host}/api/orgs/${orgA.id}/agents/${agentA.id}`, {
-        headers: { cookie: cookieViewerA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(agentRes.status, 200);
-      const agentBody = await agentRes.json();
-      assert.equal('systemPrompt' in agentBody.agent, false, 'systemPrompt must never be disclosed to viewer');
-      console.log('PASS: HTTP GET /agents returns 200 and suppresses systemPrompt');
+  // 3.5: Active Viewer reads conversation 200
+  const convRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}`, {
+    headers: { cookie: cookieViewerA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(convRes.status, 200);
 
-      // 6.5: Active Viewer reads conversation 200
-      const convRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}`, {
-        headers: { cookie: cookieViewerA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(convRes.status, 200);
-      console.log('PASS: HTTP GET /conversations returns 200 for Viewer');
+  // 3.6: Viewer is denied reading message content 403
+  const msgViewerRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}/messages/${msgA.id}`, {
+    headers: { cookie: cookieViewerA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(msgViewerRes.status, 403, 'Viewer must be denied reading message content');
 
-      // 6.6: Viewer is denied reading message content 403
-      const msgViewerRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}/messages/${msgA.id}`, {
-        headers: { cookie: cookieViewerA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(msgViewerRes.status, 403, 'Viewer must be denied reading message content');
-      console.log('PASS: VIEWER denied reading message content 403');
+  // 3.7: Upgrade Viewer to OPERATOR in DB -> immediate read allowed 200
+  await db.organizationMembership.update({
+    where: { userId_organizationId: { userId: userViewerA.id, organizationId: orgA.id } },
+    data: { role: 'OPERATOR' },
+  });
+  const msgOpRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}/messages/${msgA.id}`, {
+    headers: { cookie: cookieViewerA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(msgOpRes.status, 200, 'Upgraded Operator must be permitted to read message');
 
-      // 6.7: Upgrade Viewer to OPERATOR in DB -> immediate read allowed 200
-      await db.organizationMembership.update({
-        where: { userId_organizationId: { userId: userViewerA.id, organizationId: orgA.id } },
-        data: { role: 'OPERATOR' },
-      });
-      const msgOpRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}/messages/${msgA.id}`, {
-        headers: { cookie: cookieViewerA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(msgOpRes.status, 200, 'Upgraded Operator must be permitted to read message');
-      console.log('PASS: Upgraded role OPERATOR immediately allowed reading message 200');
+  // 3.8: Revoke membership in DB -> immediate denial 403
+  await db.organizationMembership.update({
+    where: { userId_organizationId: { userId: userViewerA.id, organizationId: orgA.id } },
+    data: { status: 'REVOKED' },
+  });
+  const msgRevokedRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}/messages/${msgA.id}`, {
+    headers: { cookie: cookieViewerA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(msgRevokedRes.status, 403, 'Revoked membership must fail closed 403');
+  console.log('VERIFIED_CASE_5: Postgres Message RBAC and Dynamic Revocation (3/3 passed)');
 
-      // 6.8: Revoke membership in DB -> immediate denial 403
-      await db.organizationMembership.update({
-        where: { userId_organizationId: { userId: userViewerA.id, organizationId: orgA.id } },
-        data: { status: 'REVOKED' },
-      });
-      const msgRevokedRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}/messages/${msgA.id}`, {
-        headers: { cookie: cookieViewerA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(msgRevokedRes.status, 403, 'Revoked membership must fail closed 403');
-      console.log('PASS: Revoked membership immediately denies request 403');
+  // 3.9: Admin Page access with ACTIVE ADMIN -> 200
+  const adminPageOk = await fetch(`${host}/admin?organizationId=${orgA.id}`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(adminPageOk.status, 200, 'Active admin must receive HTTP 200 on /admin');
+  const adminHtml = await adminPageOk.text();
+  assert.match(adminHtml, new RegExp(adminAEmail));
 
-      // 6.9: Admin Page access with ACTIVE ADMIN -> 200
-      const adminPageOk = await fetch(`${host}/admin?organizationId=${orgA.id}`, {
-        headers: { cookie: cookieAdminA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(adminPageOk.status, 200);
-      const adminHtml = await adminPageOk.text();
-      assert.match(adminHtml, new RegExp(adminAEmail));
-      console.log('PASS: /admin renders 200 for ACTIVE ADMIN');
+  // 3.10: Admin Page access with REVOKED user -> REAL HTTP 403
+  const adminPageDenied = await fetch(`${host}/admin?organizationId=${orgA.id}`, {
+    headers: { cookie: cookieViewerA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(adminPageDenied.status, 403, 'Denied admin access must return real HTTP 403 status code');
+  console.log('VERIFIED_CASE_6: Admin Page real HTTP 403 enforcement (2/2 passed)');
 
-      // 6.10: Admin Page access with REVOKED user -> 403
-      const adminPageDenied = await fetch(`${host}/admin?organizationId=${orgA.id}`, {
-        headers: { cookie: cookieViewerA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.equal(adminPageDenied.status, 200); // Next.js returns 200 with rendered 403 error component
-      const deniedHtml = await adminPageDenied.text();
-      assert.match(deniedHtml, /403 Access Denied/);
-      console.log('PASS: /admin correctly renders 403 Access Denied for REVOKED user');
+  // 3.11: Audit Page access without organizationId -> REAL HTTP 403
+  const auditMissingOrg = await fetch(`${host}/audit`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(auditMissingOrg.status, 403, 'Audit access without explicit org must return real HTTP 403');
 
-      // 6.11: Audit Page access without organizationId -> returns instructional banner
-      const auditMissingOrg = await fetch(`${host}/audit`, {
-        headers: { cookie: cookieAdminA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.match(await auditMissingOrg.text(), /Please specify an active organization parameter/);
-      console.log('PASS: /audit without organizationId requires explicit organization parameter');
+  // 3.12: Audit Page access with foreign org -> REAL HTTP 403
+  const auditForeignOrg = await fetch(`${host}/audit?organizationId=${orgB.id}`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(auditForeignOrg.status, 403, 'Audit access for foreign org must return real HTTP 403');
 
-      // 6.12: Audit Page access with foreign org -> returns 403 Access Denied
-      const auditForeignOrg = await fetch(`${host}/audit?organizationId=${orgB.id}`, {
-        headers: { cookie: cookieAdminA },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert.match(await auditForeignOrg.text(), /403 Access Denied/);
-      console.log('PASS: /audit for foreign organization returns 403 Access Denied');
+  // 3.13: Audit Page access with ACTIVE ADMIN of own org -> HTTP 200
+  const auditOwnOrg = await fetch(`${host}/audit?organizationId=${orgA.id}`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(auditOwnOrg.status, 200, 'Authorized admin must receive HTTP 200 on /audit');
+  const auditHtml = await auditOwnOrg.text();
+  assert.match(auditHtml, /Operational Events/);
+  assert.doesNotMatch(auditHtml, /helpus\.ecommerce@gmail\.com/);
+  console.log('VERIFIED_CASE_7: Audit Page real HTTP 403 and authorized 200 (3/3 passed)');
 
-      // 6.13: Audit Page access with ACTIVE ADMIN of own org -> renders audit view safely
-      const auditOwnOrg = await fetch(`${host}/audit?organizationId=${orgA.id}`, {
-        headers: { cookie: cookieAdminA },
-        signal: AbortSignal.timeout(5000),
-      });
-      const auditHtml = await auditOwnOrg.text();
-      assert.match(auditHtml, /Operational Events (&amp;|&) Audit Trail/);
-      assert.doesNotMatch(auditHtml, /helpus\.ecommerce@gmail\.com/);
-      console.log('PASS: /audit for authorized admin renders safely without leaks');
-    }
-  }
-
-  console.log('ALL_AUTHENTICATED_HTTP_INVARIANTS_PASSED');
+  console.log('ALL_POSTGRESQL_AUTHENTICATED_E2E_CASES_VERIFIED: 17/17 ASSERCOES CONFIRMADAS');
 } finally {
   if (cleanupFn) await cleanupFn();
   if (db) await db.$disconnect();

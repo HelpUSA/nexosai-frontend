@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth/next';
-import { redirect } from 'next/navigation';
+import { redirect, forbidden } from 'next/navigation';
 import { makeAuthOptions } from '@/lib/auth-options';
 import { authorizeAuditAccess } from '@/lib/admin-access.mjs';
 import { db } from '@/lib/db';
@@ -29,13 +29,7 @@ export default async function AuditLogsPage({
   const targetOrgId = resolvedParams?.organizationId;
 
   if (!targetOrgId) {
-    return (
-      <section className='hero'>
-        <span className='badge'>{t.audit.badge}</span>
-        <h1>{t.audit.title}</h1>
-        <p>Please specify an active organization parameter (?organizationId=...) to review audit logs.</p>
-      </section>
-    );
+    forbidden();
   }
 
   const authz = await authorizeAuditAccess({
@@ -45,17 +39,7 @@ export default async function AuditLogsPage({
   });
 
   if (!authz.ok) {
-    return (
-      <section className='hero'>
-        <span className='badge' style={{ background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' }}>
-          403 Access Denied
-        </span>
-        <h1>Audit Log Authorization Required</h1>
-        <p>
-          Viewing organizational audit records requires an ACTIVE ADMIN, OWNER, or OPERATOR role in organization &quot;{targetOrgId}&quot;.
-        </p>
-      </section>
-    );
+    forbidden();
   }
 
   let logs: any[] = [];
@@ -93,7 +77,7 @@ export default async function AuditLogsPage({
       </section>
 
       <section className='card'>
-        <h2>Operational Events & Audit Trail</h2>
+        <h2>Operational Events &amp; Audit Trail</h2>
         {logs.length === 0 ? (
           <p style={{ marginTop: 16, color: 'var(--text-muted)' }}>
             No execution logs recorded for this organization.

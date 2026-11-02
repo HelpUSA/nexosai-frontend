@@ -1,5 +1,5 @@
 import { getServerSession } from 'next-auth/next';
-import { redirect } from 'next/navigation';
+import { redirect, forbidden } from 'next/navigation';
 import { makeAuthOptions } from '@/lib/auth-options';
 import { authorizeAdminAccess } from '@/lib/admin-access.mjs';
 import { db } from '@/lib/db';
@@ -34,17 +34,7 @@ export default async function AdminPage({
   });
 
   if (!authz.ok) {
-    return (
-      <section className='hero'>
-        <span className='badge' style={{ background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' }}>
-          403 Access Denied
-        </span>
-        <h1>Administrative Authorization Required</h1>
-        <p>
-          Your account ({session.user.email}) does not hold an ACTIVE administrative role (ADMIN or OWNER) in this organization.
-        </p>
-      </section>
-    );
+    forbidden();
   }
 
   return (
