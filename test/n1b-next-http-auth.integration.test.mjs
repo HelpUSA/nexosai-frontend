@@ -270,7 +270,7 @@ try {
         signal: AbortSignal.timeout(5000),
       });
       const auditHtml = await auditOwnOrg.text();
-      assert.match(auditHtml, /Operational Events & Audit Trail/);
+      assert.match(auditHtml, /Operational Events (&amp;|&) Audit Trail/);
       assert.doesNotMatch(auditHtml, /helpus\.ecommerce@gmail\.com/);
       console.log('PASS: /audit for authorized admin renders safely without leaks');
     }
