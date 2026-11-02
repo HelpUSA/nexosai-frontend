@@ -1,6 +1,8 @@
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { makeAuthOptions } from '@/lib/auth-options';
+import { authorizeAdminAccess } from '@/lib/admin-access.mjs';
+import { db } from '@/lib/db';
 import { translations, getLang } from '@/i18n/translations';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lang?: string }> | { lang?: string };
+  searchParams: Promise<{ lang?: string; organizationId?: string }> | { lang?: string; organizationId?: string };
 }) {
   let session = null;
   try {
@@ -24,6 +26,26 @@ export default async function AdminPage({
   const resolvedParams = await searchParams;
   const lang = getLang(resolvedParams?.lang);
   const t = translations[lang] || translations.en;
+
+  const authz = await authorizeAdminAccess({
+    email: session.user.email,
+    organizationId: resolvedParams?.organizationId,
+    db,
+  });
+
+  if (!authz.ok) {
+    return (
+      <section className='hero'>
+        <span className='badge' style={{ background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' }}>
+          403 Access Denied
+        </span>
+        <h1>Administrative Authorization Required</h1>
+        <p>
+          Your account ({session.user.email}) does not hold an ACTIVE administrative role (ADMIN or OWNER) in this organization.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <>
@@ -42,8 +64,12 @@ export default async function AdminPage({
               <strong>{session.user.email}</strong>
             </div>
             <div>
-              <span>Default Role</span>
-              <strong>VIEWER</strong>
+              <span>Organization</span>
+              <strong>{authz.organizationId}</strong>
+            </div>
+            <div>
+              <span>Active Role</span>
+              <strong>{authz.role}</strong>
             </div>
             <div>
               <span>OAuth Provider</span>

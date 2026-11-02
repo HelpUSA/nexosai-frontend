@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth/next';
 import { redirect } from 'next/navigation';
 import { makeAuthOptions } from '@/lib/auth-options';
+import { authorizeAuditAccess } from '@/lib/admin-access.mjs';
 import { db } from '@/lib/db';
 import { translations, getLang } from '@/i18n/translations';
 
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function AuditLogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lang?: string }> | { lang?: string };
+  searchParams: Promise<{ lang?: string; organizationId?: string }> | { lang?: string; organizationId?: string };
 }) {
   let session = null;
   try {
@@ -25,32 +26,61 @@ export default async function AuditLogsPage({
   const resolvedParams = await searchParams;
   const lang = getLang(resolvedParams?.lang);
   const t = translations[lang] || translations.en;
+  const targetOrgId = resolvedParams?.organizationId;
+
+  if (!targetOrgId) {
+    return (
+      <section className='hero'>
+        <span className='badge'>{t.audit.badge}</span>
+        <h1>{t.audit.title}</h1>
+        <p>Please specify an active organization parameter (?organizationId=...) to review audit logs.</p>
+      </section>
+    );
+  }
+
+  const authz = await authorizeAuditAccess({
+    email: session.user.email,
+    organizationId: targetOrgId,
+    db,
+  });
+
+  if (!authz.ok) {
+    return (
+      <section className='hero'>
+        <span className='badge' style={{ background: '#fef2f2', color: '#b91c1c', borderColor: '#fecaca' }}>
+          403 Access Denied
+        </span>
+        <h1>Audit Log Authorization Required</h1>
+        <p>
+          Viewing organizational audit records requires an ACTIVE ADMIN, OWNER, or OPERATOR role in organization &quot;{targetOrgId}&quot;.
+        </p>
+      </section>
+    );
+  }
 
   let logs: any[] = [];
   try {
-    // Find active organization membership for the authenticated user
-    const user = await db.user.findUnique({
-      where: { email: session.user.email.toLowerCase() },
+    // Select safe metadata only: exclude raw log.details and personal user information to prevent data leakage.
+    logs = await db.auditLog.findMany({
+      where: { organizationId: targetOrgId },
+      take: 15,
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
-        memberships: {
-          where: { status: 'ACTIVE' },
-          select: { organizationId: true, role: true },
+        action: true,
+        severity: true,
+        createdAt: true,
+        organizationId: true,
+        node: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
         },
       },
     });
-
-    const activeOrgId = user?.memberships?.[0]?.organizationId;
-    if (activeOrgId) {
-      logs = await db.auditLog.findMany({
-        where: { organizationId: activeOrgId },
-        take: 15,
-        orderBy: { createdAt: 'desc' },
-        include: { user: true, node: true },
-      });
-    }
   } catch (e) {
-    // Log failure server-side, fail-closed to empty logs
     logs = [];
   }
 
@@ -59,14 +89,14 @@ export default async function AuditLogsPage({
       <section className='hero'>
         <span className='badge'>{t.audit.badge}</span>
         <h1>{t.audit.title}</h1>
-        <p>{t.audit.description}</p>
+        <p>Audit trail for organization: <strong>{targetOrgId}</strong></p>
       </section>
 
       <section className='card'>
-        <h2>Recent Execution Logs</h2>
+        <h2>Operational Events & Audit Trail</h2>
         {logs.length === 0 ? (
           <p style={{ marginTop: 16, color: 'var(--text-muted)' }}>
-            No execution logs found for the active organization.
+            No execution logs recorded for this organization.
           </p>
         ) : (
           <ul className='list' style={{ marginTop: 16 }}>
@@ -80,9 +110,8 @@ export default async function AuditLogsPage({
                     {new Date(log.createdAt).toLocaleString(lang === 'pt' ? 'pt-BR' : lang === 'es' ? 'es-ES' : 'en-US')}
                   </span>
                 </div>
-                <p style={{ margin: 0, fontWeight: '600', color: 'var(--text-dark)' }}>{log.details}</p>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                  User: {log.user?.email || 'System'} {log.node ? `| Node: ${log.node.name}` : ''}
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-dark)', marginTop: 4 }}>
+                  Severity: <strong>{log.severity}</strong> {log.node ? `| Resource Node: ${log.node.name}` : ''}
                 </div>
               </li>
             ))}
