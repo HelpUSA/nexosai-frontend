@@ -4,6 +4,7 @@ on:
     branches:
       - 'test/g3c-postgres-integration-20261101'
       - 'test/g3c-order038-gaps-closure-20261101'
+      - 'test/g3c-unified-gates-candidate-20261102'
   pull_request:
     branches:
       - 'audit/n1b-dev-advisories-20261101'

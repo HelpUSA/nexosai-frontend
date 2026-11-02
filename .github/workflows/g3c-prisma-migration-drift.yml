@@ -1,0 +1,61 @@
+name: G3C Prisma Migration Drift Gate (Disposable Only)
+on:
+  push:
+    branches:
+      - 'audit/g3c-migration-drift-gate-20261102'
+      - 'test/g3c-unified-gates-candidate-20261102'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  migration-no-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nexosai_drift
+          POSTGRES_PASSWORD: ephemeral_test_only
+          POSTGRES_DB: nexosai_g3c_drift_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexosai_drift -d nexosai_g3c_drift_test"
+          --health-interval 3s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://nexosai_drift:ephemeral_test_only@127.0.0.1:5432/nexosai_g3c_drift_test
+      G3C_EPHEMERAL_POSTGRES: 'YES'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Validate schema and disposable-only target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$G3C_EPHEMERAL_POSTGRES" = "YES"
+          case "$DATABASE_URL" in
+            postgresql://nexosai_drift:*@127.0.0.1:5432/nexosai_g3c_drift_test) ;;
+            *) echo "Refusing non-ephemeral database target" >&2; exit 1 ;;
+          esac
+          npx prisma validate
+      - name: Apply historical migrations without db push
+        run: npx prisma migrate deploy
+      - name: Verify migration history strictly
+        run: npx prisma migrate status
+      - name: Detect drift between migrated SQL and Prisma schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+      - name: Repeat deployment to prove idempotency
+        run: npx prisma migrate deploy
+      - name: Verify no drift after second deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
