@@ -44,14 +44,14 @@ jobs:
       - run: npm ci --ignore-scripts --no-fund
       - run: npx prisma validate
       - run: npx prisma generate
-      - name: Baseline ephemeral push
-        run: npx prisma db push --skip-generate
       - name: Run versioned Prisma migrate deploy on disposable database
         run: npx prisma migrate deploy
       - name: Verify versioned Prisma migration history on disposable database (fail-hard)
         run: npx prisma migrate status
       - name: Verify idempotent migration re-deployment
         run: npx prisma migrate deploy
+      - name: Baseline ephemeral push
+        run: npx prisma db push --skip-generate
       - name: Admin & tenant authorization unit regression
         run: node --test test/n1b-admin-guard.test.mjs test/n1b-scoped-resources.test.mjs test/n1b-provisioning-policy.test.mjs test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1a-oidc-http-integration.test.mjs test/n1b-order040-independent-acceptance.test.mjs
       - name: Postgres authorization integration
