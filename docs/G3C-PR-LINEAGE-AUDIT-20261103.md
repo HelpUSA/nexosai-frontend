@@ -36,3 +36,19 @@ Each row below is from GitHub compare of `base=<individual PR HEAD>` and `head=<
 ## Explicit limitations
 
 This is a source-control ancestry review, **not** approval to merge or proof that divergent work is missing: equivalent source changes can be reimplemented on the candidate without original commits. Perform file-level and behavior-level comparisons separately. The candidate remains **G3B sandbox GO; G3C NOT_AUTHORIZED**. Existing migrations, Neon DB, OAuth credentials and user data remain untouched.
+
+## File-level collision candidates for focused review
+
+GitHub PR changed-file listings show the following divergent branch areas:
+
+| PR | Selected changed paths | Recommended handling |
+|---|---|---|
+| #3 | `prisma/schema.prisma`, `sandbox/n1b/tenant-guards.mjs`, `test/n1b-tenant-guards.test.mjs` | Compare membership semantics and tests; ensure new versioned SQL covers necessary fields; no automatic schema merge |
+| #11 | `src/app/{admin,agents,audit,conversations,dashboard,nodes,projects}/layout.tsx`, `src/lib/require-active-tenant.ts`, real HTTP tests | Security-critical route-guard comparison; check protections not weakened in PR #21 |
+| #12 | `package-lock.json`, `package.json`, Babel remediation workflow | Verify current lock already covers equivalent updates; separate from B1 major-version minimatch probes |
+| #13 | `src/lib/auth-options.ts`, `src/lib/google-admission.mjs`, bootstrap policies | Evaluate Google admission/provisioning semantics as B3 candidate, independently of real-OAuth credentials |
+| #14 | `src/app/audit/page.tsx`, `src/lib/audit-access.mjs`, `test/n1b-google-provider-oidc-http.test.mjs`, `test/n1b-https-cookie-invariants.test.mjs` | Compare audit RBAC and synthetic HTTPS cookie tests with unified candidate; do not claim real OAuth proven |
+| #15 | `package.json`, `package-lock.json`, security integration CI | Compare prior dependency/config/security suite with candidate; not an automatic merge |
+| #2 | `src/app/components/DemoBanner.tsx`, `src/i18n/demo.ts`, dashboard/agent pages | Decide whether Demo/UNKNOWN UX is within this release, separate from authorization gate |
+
+This queue is required to prevent an apparently green candidate from silently omitting security guarantees proven on divergent experimental branches.
