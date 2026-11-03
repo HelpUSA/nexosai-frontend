@@ -22,3 +22,12 @@ Why scoped? A global major-version override could disrupt eslint's other `minima
 
 ## Separation of concerns
 B1 is independent of B2 Neon inventory, B3 real OAuth/HTTPS, and B4 authorization. This experiment uses no production services, secrets or databases. Its CI status should be interpreted as a probe, not as overall G3C readiness.
+
+
+## Empirical results on 2026-11-03 (GitHub Actions)
+
+1. **Scoped override, runner-only**: [Run 41660454260](https://github.com/HelpUSA/nexosai-frontend/actions/runs/41660454260) SUCCESS, with npm ci, Next build, 15 selected tests and strict production audit. Full development audit still reported **15 moderate**, 0 high/critical, even though `@typescript-eslint/typescript-estree/node_modules/minimatch` resolved to 11.0.4. Global `node_modules/minimatch` remained 3.1.5. Therefore scoped remediation is **insufficient to close B1**.
+2. **Global override, runner-only**: [Run 41660843249](https://github.com/HelpUSA/nexosai-frontend/actions/runs/41660843249) FAILED after audit returned **0 vulnerabilities**, Next build succeeded and 15 selected unit tests passed. ESLint runtime crashed with `TypeError: (0 , brace_expansion_1.expand) is not a function` in `@eslint/config-array`. Therefore **DO NOT APPLY GLOBAL minimatch 11.0.4 OVERRIDE** to candidate or release. Zero findings on npm audit does not compensate for broken tooling.
+3. The tests ran on disposable CI and did **not** commit a modified manifest/lockfile. Parent candidate PR #21 and production are unchanged.
+
+**B1 decision: still OPEN.** Preferred next action is to identify compatible upstream dependency updates or safe patches supported by affected package maintainers, while separately tracking residual dev-only risk and asking an authorized owner to decide if no compatible remediation exists.
