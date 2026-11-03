@@ -31,3 +31,10 @@ B1 is independent of B2 Neon inventory, B3 real OAuth/HTTPS, and B4 authorizatio
 3. The tests ran on disposable CI and did **not** commit a modified manifest/lockfile. Parent candidate PR #21 and production are unchanged.
 
 **B1 decision: still OPEN.** Preferred next action is to identify compatible upstream dependency updates or safe patches supported by affected package maintainers, while separately tracking residual dev-only risk and asking an authorized owner to decide if no compatible remediation exists.
+
+## Reproducible final comparison (same PR HEAD 86dea979acfde9e989702c235e4eff948047b291)
+
+- **Scoped** override: [CI 41661465082](https://github.com/HelpUSA/nexosai-frontend/actions/runs/41661465082) **SUCCESS**, including a focused ESLint API compatibility smoke on `src/lib/admin-access.mjs`. Maintains **15 moderate** advisories. This confirms the runtime remains functional for the tested path but does not certify lint cleanliness throughout the repository.
+- **Global** override: [CI 41661465295](https://github.com/HelpUSA/nexosai-frontend/actions/runs/41661465295) **FAILURE** in `Static ESLint compatibility smoke`; preceding audit/build/unit steps succeeded. The earlier run at the same override observed incompatible `brace_expansion_1.expand` API use. Not acceptable as a release remediation.
+
+**Engineering decision:** Keep B1 OPEN. Do not add the global override to the production candidate. Preserve these results as evidence of an unsuitable quick fix. Only a compatible supported upstream update or a separately signed residual-risk decision can address B1.
