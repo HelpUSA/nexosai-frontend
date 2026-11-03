@@ -208,6 +208,36 @@ try {
   assert.equal('systemPrompt' in agentBody.agent, false, 'systemPrompt must never be disclosed to viewer');
   console.log('VERIFIED_CASE_4: Postgres Agent Isolation & systemPrompt suppression (1/1 passed)');
 
+
+  // Agents page: real HTTP tenant isolation and systemPrompt minimization.
+  const agentsPageOwn = await fetch(`${host}/agents?organizationId=${orgA.id}`, {
+    headers: { cookie: cookieViewerA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(agentsPageOwn.status, 200, 'Active member can view own tenant agents');
+  const agentsOwnHtml = await agentsPageOwn.text();
+  assert.match(agentsOwnHtml, /Agent E2E A/, 'Authorized agents must render');
+  assert.doesNotMatch(agentsOwnHtml, /TOP_SECRET_PROMPT|System Prompt/, 'No prompt or prompt label may render');
+
+  const agentsPageForeign = await fetch(`${host}/agents?organizationId=${orgB.id}`, {
+    headers: { cookie: cookieViewerA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(agentsPageForeign.status, 403, 'Foreign tenant agents must return real 403');
+
+  const agentsPageNoOrg = await fetch(`${host}/agents`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(agentsPageNoOrg.status, 403, 'Page must require explicit organizationId');
+
+  const agentsPageTamperedOrg = await fetch(`${host}/agents?organizationId=..%2Fsecret`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(agentsPageTamperedOrg.status, 403, 'Malformed tenant context must be denied');
+  console.log('VERIFIED_AGENTS_PAGE: tenant binding, real HTTP 403, and prompt suppression (4/4 passed)');
+
   // 3.5: Active Viewer reads conversation 200
   const convRes = await fetch(`${host}/api/orgs/${orgA.id}/conversations/${convA.id}`, {
     headers: { cookie: cookieViewerA },
