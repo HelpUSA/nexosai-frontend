@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - audit/g3c-typescript-build-gate-20261103
+      - 'test/g3c-strict-release-candidate-20261103'
   workflow_dispatch:
 permissions:
   contents: read
