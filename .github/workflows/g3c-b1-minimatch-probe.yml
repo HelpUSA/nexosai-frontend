@@ -1,0 +1,78 @@
+name: G3C B1 minimatch targeted remediation probe (non-release)
+on:
+  push:
+    branches:
+      - audit/g3c-b1-remediation-probe-20261103
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  b1-minimatch-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/never_connect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Add experimental scoped override (do not commit regenerated lockfile)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));
+          pkg.overrides ??= {};
+          pkg.overrides['@typescript-eslint/typescript-estree'] = {
+            ...(typeof pkg.overrides['@typescript-eslint/typescript-estree'] === 'object' ? pkg.overrides['@typescript-eslint/typescript-estree'] : {}),
+            minimatch: '11.0.4'
+          };
+          fs.writeFileSync('package.json',JSON.stringify(pkg,null,2)+'\n');
+          NODE
+      - name: Regenerate lockfile only in this disposable runner
+        run: npm install --package-lock-only --ignore-scripts --no-fund
+      - name: Check reproducible install using regenerated experimental lockfile
+        run: npm ci --ignore-scripts --no-fund
+      - name: Report actual installed minimatch versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p=JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+          for(const [name,val] of Object.entries(p.packages||{})){
+            if(name.endsWith('/minimatch')) console.log(name+': '+val.version);
+          }
+          NODE
+      - name: Compare full development dependency advisory count
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > /tmp/g3c-dev-audit.json
+          code=$?
+          set -e
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const a=JSON.parse(fs.readFileSync('/tmp/g3c-dev-audit.json','utf8'));
+          console.log('NPM_AUDIT_EXPERIMENTAL_COUNTS',JSON.stringify(a.metadata?.vulnerabilities || {}));
+          for(const [name,v] of Object.entries(a.vulnerabilities || {})){
+            console.log('ADVISORY',name,v.severity,JSON.stringify(v.via.filter(x=>typeof x==='object').map(x=>({name:x.name,title:x.title,url:x.url,range:x.range}))));
+          }
+          NODE
+          echo "npm audit exit: $code (informational; release acceptance is separate)"
+      - name: Validate production dependencies strictly
+        run: npm audit --omit=dev --audit-level=low
+      - name: Generate Prisma client and compile candidate
+        run: |
+          npx prisma generate
+          npm run build
+      - name: Core authorization regression
+        run: node --test test/n1b-admin-guard.test.mjs test/n1b-order040-independent-acceptance.test.mjs
