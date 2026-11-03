@@ -1,0 +1,35 @@
+name: G3C Strict TypeScript Build Gate (sandbox)
+on:
+  push:
+    branches:
+      - audit/g3c-typescript-build-gate-20261103
+      - 'test/g3c-strict-release-candidate-20261103'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  strict-types:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/never_connect
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - run: npx prisma generate
+      - name: Typecheck strict
+        run: npx tsc --noEmit
+      - name: Next.js build (ignoreBuildErrors false)
+        run: npm run build
+      - run: npm audit --omit=dev --audit-level=low
