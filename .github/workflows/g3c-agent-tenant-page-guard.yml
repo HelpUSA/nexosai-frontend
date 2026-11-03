@@ -1,0 +1,53 @@
+name: G3C Agents Tenant Page Guard (Sandbox)
+on:
+  push:
+    branches:
+      - fix/g3c-agent-page-tenant-leak-20261103
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  agent-tenant-page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nexosai_test
+          POSTGRES_PASSWORD: local_ci_only
+          POSTGRES_DB: nexosai_g3c_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexosai_test -d nexosai_g3c_test"
+          --health-interval 3s --health-timeout 5s --health-retries 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      G3C_EPHEMERAL_POSTGRES: 'YES'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      DATABASE_URL: postgresql://nexosai_test:local_ci_only@127.0.0.1:5432/nexosai_g3c_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - name: Generate Prisma Client
+        run: npx prisma generate
+      - name: Apply versioned migrations to disposable PostgreSQL 16
+        run: npx prisma migrate deploy
+      - name: Strict migration status
+        run: npx prisma migrate status
+      - name: Agent page authorization and data minimization unit tests
+        run: node --test test/n1b-agent-page-tenant-guard.test.mjs test/n1b-admin-guard.test.mjs test/n1b-order040-independent-acceptance.test.mjs
+      - name: Next.js production build
+        run: npm run build
+      - name: Real HTTP PostgreSQL multi-tenant agent page regression
+        run: node test/n1b-next-http-auth.integration.test.mjs
+      - name: Production dependencies security gate
+        run: npm audit --omit=dev --audit-level=low
