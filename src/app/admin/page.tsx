@@ -63,25 +63,26 @@ export default async function AdminPage({
             </div>
             <div>
               <span>OAuth Provider</span>
-              <strong>Google Auth (Verified)</strong>
+              <strong>Google OAuth — NOT VERIFIED (B3 pending)</strong>
             </div>
           </div>
         </article>
 
         <article className='card'>
-          <h2>API Credentials & Keys</h2>
+          <h2>Integration Configuration (Unverified)</h2>
+          <p role='status'>NOT VERIFIED — actual provider credentials and service availability have not been checked.</p>
           <div className='kv'>
             <div>
               <span>OpenAI API</span>
-              <strong>Configured (GPT-4o)</strong>
+              <strong>NOT VERIFIED</strong>
             </div>
             <div>
               <span>DeepSeek API</span>
-              <strong>Configured (R1 / V3)</strong>
+              <strong>NOT VERIFIED</strong>
             </div>
             <div>
               <span>Local Ollama Bridge</span>
-              <strong>127.0.0.1:8765</strong>
+              <strong>NOT VERIFIED</strong>
             </div>
           </div>
         </article>
