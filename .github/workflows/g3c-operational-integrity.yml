@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - fix/g3c-admin-audit-operational-integrity-20261103
+      - test/g3c-unified-integrity-candidate-20261103
   workflow_dispatch:
 permissions:
   contents: read
