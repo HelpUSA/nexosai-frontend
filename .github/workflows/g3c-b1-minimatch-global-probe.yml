@@ -1,0 +1,56 @@
+name: G3C B1 minimatch global override compatibility probe
+on:
+  push:
+    branches:
+      - audit/g3c-b1-remediation-probe-20261103
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  global-major-override-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/never_connect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Trial global minimatch override (runner only, NOT release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p=JSON.parse(fs.readFileSync('package.json','utf8'));
+          p.overrides ??= {};
+          p.overrides.minimatch='11.0.4';
+          fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');
+          NODE
+          npm install --package-lock-only --ignore-scripts --no-fund
+          npm ci --ignore-scripts --no-fund
+      - name: Audit all dependency advisories (must be zero for this experiment)
+        run: npm audit --audit-level=moderate
+      - name: Record minimatch versions
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const p=JSON.parse(fs.readFileSync('package-lock.json','utf8'));
+          for(const [name,val] of Object.entries(p.packages||{}))
+            if(name.endsWith('/minimatch')) console.log(name+': '+val.version);
+          NODE
+      - name: Build with global major override
+        run: |
+          npx prisma generate
+          npm run build
+      - name: Authorization unit suite
+        run: node --test test/n1b-admin-guard.test.mjs test/n1b-order040-independent-acceptance.test.mjs
+      - name: Static ESLint compatibility smoke
+        run: npx eslint src/lib/admin-access.mjs --no-error-on-unmatched-pattern
