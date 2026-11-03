@@ -6,14 +6,15 @@ export default async function ConversationsPage({ searchParams }: { searchParams
   const t = translations[lang] || translations.en;
 
   const conversations = [
-    { title: 'manager ai_bridge', role: 'manager', node: 'Notebook principal', status: 'lease-active' },
-    { title: 'watcher5', role: 'ops', node: 'Notebook principal', status: 'observed' },
-    { title: 'watcher6', role: 'executor', node: 'Notebook principal', status: 'active' },
-    { title: 'future relay chat', role: 'standby', node: 'Browser relay node', status: 'planned' },
+    { title: 'manager ai_bridge', role: 'manager', node: 'Notebook principal', status: 'DEMO' },
+    { title: 'watcher5', role: 'ops', node: 'Notebook principal', status: 'DEMO' },
+    { title: 'watcher6', role: 'executor', node: 'Notebook principal', status: 'DEMO' },
+    { title: 'future relay chat', role: 'standby', node: 'Browser relay node', status: 'DEMO' },
   ];
 
   return (
     <>
+      <p role="status" className="card" data-demo="true"><strong>DEMO DATA — Conversations and connection states below are examples, not live sessions.</strong></p>
       <section className='hero'>
         <span className='badge'>{t.conversations.badge}</span>
         <h1>{t.conversations.title}</h1>
