@@ -6,13 +6,14 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const t = translations[lang] || translations.en;
 
   const projects = [
-    { name: 'HelpUS E-commerce AI', agentsCount: 3, nodesCount: 2, status: 'Active' },
-    { name: 'USMLE Prep QBank Support', agentsCount: 2, nodesCount: 1, status: 'Active' },
-    { name: 'VIP Executive Driver Dispatch', agentsCount: 1, nodesCount: 1, status: 'Active' },
+    { name: 'Example E-commerce Assistant', agentsCount: 3, nodesCount: 2, status: 'DEMO' },
+    { name: 'Example Study Support', agentsCount: 2, nodesCount: 1, status: 'DEMO' },
+    { name: 'Example Dispatch', agentsCount: 1, nodesCount: 1, status: 'DEMO' },
   ];
 
   return (
     <>
+      <p role="status" className="card" data-demo="true"><strong>DEMO DATA — Project names, counts and activity statuses below are examples, not verified customer records.</strong></p>
       <section className='hero'>
         <span className='badge'>{t.projects.badge}</span>
         <h1>{t.projects.title}</h1>

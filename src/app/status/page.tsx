@@ -8,7 +8,7 @@ export default function StatusPage() {
  <h1 className="text-4xl font-bold">
  Nexos<span className="text-[#6c63ff]">AI</span> Status
  </h1>
- <p className="text-gray-400 mt-2">Live System Architecture & Message Flow</p>
+ <p className="text-gray-400 mt-2">Illustrative architecture (DEMO) — live status not verified</p>
  </div>
 
  {/* Architecture Diagram - SVG */}
@@ -81,13 +81,14 @@ export default function StatusPage() {
  </div>
  </div>
 
- {/* Status Cards */}
+ {/* Status Cards — never claim live telemetry without a verified backend signal */}
+ <p role="status" className="text-center text-amber-300 mb-6">DEMO / NOT VERIFIED — No live health checks or telemetry are connected. All service statuses are UNKNOWN.</p>
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
  {[
- { label: 'Gateway', status: 'Online', color: '#00ff88' },
- { label: 'Railway API', status: 'Online', color: '#00ff88' },
- { label: 'Database', status: 'Connected', color: '#00ff88' },
- { label: 'Worker', status: 'Running', color: '#00ff88' },
+ { label: 'Gateway', status: 'UNKNOWN', color: '#a3a3a3' },
+ { label: 'Railway API', status: 'UNKNOWN', color: '#a3a3a3' },
+ { label: 'Database', status: 'UNKNOWN', color: '#a3a3a3' },
+ { label: 'Worker', status: 'UNKNOWN', color: '#a3a3a3' },
  ].map(s => (
  <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
  <div className="flex justify-center mb-2">
@@ -101,7 +102,7 @@ export default function StatusPage() {
 
  <div className="text-center">
  <a href="/download" className="inline-block px-6 py-3 bg-[#6c63ff] text-white rounded-lg font-semibold hover:bg-[#5a52d5] transition">
- ⬇ Download Windows Installer
+ ⬇ Installer information (availability unverified)
  </a>
  </div>
  </div>

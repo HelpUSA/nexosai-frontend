@@ -9,25 +9,26 @@ export default async function NodesPage({ searchParams }: { searchParams: Promis
     {
       name: 'Notebook Principal',
       type: 'Full Node',
-      status: 'online-ready',
+      status: 'DEMO',
       detail: 'Extensão + AI Bridge local + Control Center + gateway 8765',
     },
     {
       name: 'Browser Relay Node',
       type: 'Light Node',
-      status: 'active',
+      status: 'DEMO',
       detail: 'Extensão apenas para relay de mensagens e presença no navegador',
     },
     {
       name: 'PC Backup Workstation',
       type: 'Full Node',
-      status: 'standby',
+      status: 'DEMO',
       detail: 'Instalação recuperável para continuidade operacional',
     },
   ];
 
   return (
     <>
+      <p role="status" className="card" data-demo="true"><strong>DEMO DATA — Node names and connectivity states below are illustrative, not live health readings.</strong></p>
       <section className='hero'>
         <span className='badge'>{t.nodes.badge}</span>
         <h1>{t.nodes.title}</h1>

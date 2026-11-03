@@ -4,6 +4,7 @@ on:
     branches:
       - 'audit/g3c-migration-drift-gate-20261102'
       - 'test/g3c-unified-gates-candidate-20261102'
+      - 'test/g3c-unified-hardening-candidate-20261103'
   workflow_dispatch:
 permissions:
   contents: read
