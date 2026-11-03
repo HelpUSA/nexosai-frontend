@@ -14,6 +14,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
+      <p role="status" className="card" data-demo="true"><strong>DEMO / NOT VERIFIED — The metrics below are illustrative, not live operational measurements.</strong></p>
       <section className='hero'>
         <span className='badge'>{t.dashboard.badge}</span>
         <h1>{t.dashboard.title}</h1>
