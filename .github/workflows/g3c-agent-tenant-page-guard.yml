@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - fix/g3c-agent-page-tenant-leak-20261103
+      - 'test/g3c-unified-hardening-candidate-20261103'
   workflow_dispatch:
 permissions:
   contents: read
