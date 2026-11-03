@@ -1,3 +1,5 @@
+import type { PrismaClient } from '@prisma/client';
+
 export type AgentListAuthorization =
   | { ok: false; status: number; code: string }
   | { ok: true; status: 200; organizationId: string; role: 'VIEWER' | 'OPERATOR' | 'ADMIN' | 'OWNER' };
@@ -5,12 +7,7 @@ export type AgentListAuthorization =
 export declare function authorizeAgentList(args: {
   email?: string | null;
   organizationId?: string | null;
-  db: {
-    user: { findUnique: (args: unknown) => Promise<{ id: string } | null> };
-    organizationMembership: {
-      findUnique: (args: unknown) => Promise<{ organizationId: string; role: 'VIEWER' | 'OPERATOR' | 'ADMIN' | 'OWNER'; status: string } | null>;
-    };
-  };
+  db: PrismaClient;
 }): Promise<AgentListAuthorization>;
 
 export declare const AGENT_PUBLIC_LIST_SELECT: Readonly<{
