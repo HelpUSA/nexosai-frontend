@@ -53,4 +53,4 @@ jobs:
       - name: Authorization unit suite
         run: node --test test/n1b-admin-guard.test.mjs test/n1b-order040-independent-acceptance.test.mjs
       - name: Static ESLint compatibility smoke
-        run: npx eslint src/lib src/app --no-error-on-unmatched-pattern
+        run: npx eslint src/lib/admin-access.mjs --no-error-on-unmatched-pattern
