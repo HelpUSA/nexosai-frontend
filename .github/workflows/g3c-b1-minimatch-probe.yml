@@ -76,3 +76,6 @@ jobs:
           npm run build
       - name: Core authorization regression
         run: node --test test/n1b-admin-guard.test.mjs test/n1b-order040-independent-acceptance.test.mjs
+
+      - name: ESLint compatibility smoke for scoped override
+        run: npx eslint src/lib src/app --no-error-on-unmatched-pattern
