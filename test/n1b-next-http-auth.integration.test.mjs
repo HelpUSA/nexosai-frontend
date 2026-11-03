@@ -318,6 +318,30 @@ try {
   console.log('VERIFIED_CASE_7: Audit Page real HTTP 403 and authorized 200 (3/3 passed)');
 
   console.log('ALL_POSTGRESQL_AUTHENTICATED_E2E_CASES_VERIFIED: 17/17 ASSERCOES CONFIRMADAS');
+
+  // Isolated, reversible fault injection against the disposable PostgreSQL16 CI database only.
+  // This establishes a true HTTP failure response instead of erroneously rendering an empty audit trail.
+  // It does NOT certify an exact 503 response; Next.js Server Components may use HTTP 500 by default.
+  await db.$executeRawUnsafe('ALTER TABLE "AuditLog" RENAME TO "AuditLog_unavailable_ci"');
+  try {
+    const auditOutage = await fetch(`${host}/audit?organizationId=${orgA.id}`, {
+      headers: { cookie: cookieAdminA },
+      signal: AbortSignal.timeout(10000),
+    });
+    const outageHtml = await auditOutage.text();
+    assert.equal(auditOutage.status >= 500 && auditOutage.status < 600, true,
+      'Audit storage outage must return a server error, not a successful empty audit trail');
+    assert.doesNotMatch(outageHtml, /No execution logs recorded for this organization\./,
+      'Audit database outage must not be displayed as an empty legitimate history');
+    assert.doesNotMatch(outageHtml, /postgresql:\/\/|local_ci_only|127\.0\.0\.1:5432/i,
+      'Audit error page must not leak database connection information');
+    console.log('VERIFIED_AUDIT_STORAGE_OUTAGE_HTTP: server error, never empty trail, no DB credentials');
+  } finally {
+    // Never leave the disposable runner's database schema damaged, even if the assertion fails.
+    await db.$executeRawUnsafe('ALTER TABLE "AuditLog_unavailable_ci" RENAME TO "AuditLog"');
+  }
+
+
 } finally {
   if (cleanupFn) await cleanupFn();
   if (db) await db.$disconnect();

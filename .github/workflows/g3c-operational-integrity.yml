@@ -1,0 +1,31 @@
+name: G3C Operational Integrity (Sandbox Only)
+on:
+  push:
+    branches:
+      - fix/g3c-admin-audit-operational-integrity-20261103
+      - test/g3c-unified-integrity-candidate-20261103
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      DATABASE_URL: postgresql://synthetic:synthetic@127.0.0.1:5432/never_connect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - run: node --test test/n1b-operational-integrity.test.mjs test/n1b-admin-guard.test.mjs test/n2a-demo-status-honesty.test.mjs
+      - run: npx prisma generate
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=low

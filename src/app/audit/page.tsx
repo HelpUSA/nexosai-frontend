@@ -64,8 +64,10 @@ export default async function AuditLogsPage({
         },
       },
     });
-  } catch (e) {
-    logs = [];
+  } catch {
+    // A storage failure is not evidence of an empty audit trail.
+    // Render an explicit failure rather than a misleading no-events message.
+    throw new Error('AUDIT_STORAGE_UNAVAILABLE');
   }
 
   return (
