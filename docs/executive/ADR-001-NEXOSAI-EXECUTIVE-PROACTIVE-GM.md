@@ -1,35 +1,36 @@
 # ADR-001: Arquitetura do Módulo NexosAI Executive (Gerente Geral Executivo Proativo)
 
-- **Status**: PROPOSTO (Fase F0 — Design & Co-Design Documental)
-- **Data**: 2026-11-04
-- **Ordem de Referência**: `HU-HUB-ORDER059-NEXOSAI-EXECUTIVE-CODESIGN-20261104`
-- **Autores**: Antigravity & ChatGPT (HelpUS Hub Co-Design)
-- **Escopo**: Módulo "NexosAI Executive" sobre a fundação Multi-Tenant do `HelpUSA/nexosai-frontend` (piloto interno HelpUS e futura comercialização SaaS B2B).
+- **Status**: PROPOSTO — REVISÃO HARDENING ORDEM 060 (Fase F0 — Design & Co-Design Documental; **Não equivale à aprovação D1 nem autoriza início de F1A**)
+- **Data**: 2026-11-04 (Revisão v1.1 — Hardening Ordem 060)
+- **Ordens de Referência**: `HU-HUB-ORDER059-NEXOSAI-EXECUTIVE-CODESIGN-20261104`, `HU-HUB-ORDER060-EXECUTIVE-ADR-HARDENING-20261104`
+- **Linhagem de Branch (Stacked PR Dependency)**: Este PR Draft ([PR #32](https://github.com/HelpUSA/nexosai-frontend/pull/32), branch `docs/nexosai-executive-codesign-order059-20261104`) é **stacked** diretamente sobre a branch candidata do [PR #31](https://github.com/HelpUSA/nexosai-frontend/pull/31) (`test/g3c-strict-release-candidate-20261103`, HEAD `bb1830976ac9a16066400b0839a39be83cac8bef`), contendo exclusivamente 4 arquivos documentais em `docs/executive/`. Não pode ser mergeado antes da deliberação do PR #31 e do aceite executivo formal D1.
 
 ---
 
-## 1. Contexto e Problema
+## 1. Matriz de Conformidade e Mudanças da Revisão Técnica (Ordem 060 — `PASS / OPEN / DECISION`)
 
-O Master SuperAdmin opera simultaneamente múltiplas frentes de engenharia de software (`nexosai`, `autista`, `fit`, `books`, `rodrigocosta`, `helpus-fba`), atendimento a clientes, funil de vendas, triagem de e-mails, incubação de novas ideias e compromissos particulares.
-
-Ferramentas tradicionais de IA operam sob paradigma **reativo** (aguardam prompt humano) e listas de tarefas convencionais sofrem de **passividade e fadiga de manutenção**. O objetivo do **NexosAI Executive** é atuar como um **Gerente Geral Executivo Proativo (AI Chief of Staff)** que:
-1. Inspeciona continuamente sinais omnicanal (repositórios, deploys, e-mails opt-in, CRM/clientes e notas rápidas).
-2. Prioriza de forma determinística e explicável o que não pode ser esquecido.
-3. Entrega o trabalho pré-encaminhado (rascunhos ou ordens técnicas prontas) sob governança estrita de aprovação humana.
-4. Despacha ordens aprovadas para execução autônoma por agentes (Antigravity e ChatGPT) e exige **evidência verificável** antes de declarar qualquer tarefa concluída.
+| Item | Exigência de Hardening (Ordem 060) | Status | Resolução Documental Aplicada (v1.1) |
+| :--- | :--- | :---: | :--- |
+| **H-01** | **Integridade Relacional Multi-Tenant (Composite FKs)** | **PASS** | Todas as relações entre entidades tenant-scoped em `SCHEMA-PROPOSAL-NEXOSAI-EXECUTIVE.prisma.md` agora declaram `@@unique([id, organizationId])` nas tabelas pai e chaves estrangeiras compostas `fields: [<fkId>, organizationId], references: [id, organizationId]` nas tabelas filhas, impedindo associação cruzada entre organizações no nível do SGBD, somado a defesa em profundidade via PostgreSQL RLS. |
+| **H-02** | **Isolamento Real do Personal Vault & Escopo MVP F1A** | **DECISION / PASS** | Explicitado que `sensitivity = PERSONAL_VAULT` + filtro `ownerId` é apenas controle lógico de aplicação e **não protege** contra acesso de infraestrutura, dumps ou backups sem criptografia de envelope (AEAD AES-256-GCM com DEK por usuário) ou segregação de storage. **Ingestão de Vida Pessoal ADIADA para fora do MVP F1A** até revisão e aprovação específica de privacidade/criptografia. |
+| **H-03** | **Outbox Transacional Formal (`OutboxEvent` & At-Least-Once)** | **PASS** | Adicionada a tabela explícita `OutboxEvent` gravada na mesma transação ACID das mutações de `WorkItem`/`DecisionRequest`/`ExecutionOrder`. Semântica declarada como **`at-least-once`** (não `exactly-once`), exigindo deduplicação idempotente no receptor, lease com expiração, retries com backoff exponencial + jitter e fila `DEAD_LETTER`. |
+| **H-04** | **Aprovação de Payload Editado (`ADJUSTED_AND_APPROVED`)** | **PASS** | Fluxo corrigido para **duas etapas obrigatórias**: se o executivo editar um rascunho/ordem, o sistema persiste uma nova revisão (`revisionNumber + 1`), recalcula o `canonicalPayloadHash` sobre o JSON canônico RFC 8785, exibe o diff visual e exige confirmação explícita vinculada ao **novo hash** (com TTL estrito, token `consume-once`, proteção CSRF e checagem RBAC + tenant). |
+| **H-05** | **Defesa contra Prompt Injection Semântico** | **PASS** | Explicitado que truncamento/remoção de HTML (`summaryRedacted`) **não elimina comandos maliciosos semânticos** em linguagem natural. Todo dado externo é marcado como `UNTRUSTED_DATA` em envelopes XML/JSON segregados, o LLM opera com **zero tool-calling de escrita/execução**, e o Policy Engine determinístico bloqueia qualquer transição sem `DecisionRequest` humana. |
+| **H-06** | **Revisão de Estimativas de Custo e Garantias Operacionais** | **PASS** | Removidas afirmações absolutas ("custo zero", "100% dos requisitos", "zero perda"). Documentados limites reais do Neon Free Tier (0.5 GB storage, compute hours/autosuspend), limites de invocação do Vercel Cron e expiração de `historyId` do Gmail (`HTTP 404`), que exige fallback de reconciliação por janela de tempo. |
+| **H-07** | **Gates de Feature Flag (UI, API, Cron, Workers) e Independência de DNS** | **PASS** | Definido gate global e por tenant (`NEXOSAI_EXECUTIVE_ENABLED` + `ExecutiveWorkspace.featureFlagEnabled = false` por padrão) que nega execução em **4 superfícies**: UI, rotas de API, endpoints de Cron e Workers de fila. Testes unitários e de integração F1A rodam localmente/CI sem depender do DNS externo da Ordem 058. Nenhuma migration será criada ou rodada antes da Decisão D1. |
+| **H-08** | **Cadências, Timezone/DST, Rate Limit e Pausa como Defaults Propostos** | **DECISION / PASS** | Horários (`08:00`, `13:00`, Segunda `08:30`, `quietHours 22:00–07:00` em `America/Fortaleza`) tratados estritamente como **defaults propostos sujeitos à Decisão D2**. Especificadas regras de conversão IANA/DST, deduplicação por janela de agendamento, rate limit e pausa temporária (`pauseUntil`). |
 
 ---
 
-## 2. Confronto e Consolidação: Proposta Original (6 Pilares) vs. Extensões da Ordem 059
+## 2. Contexto e Problema
 
-| Pilar Original (Antigravity) | Extensão Arquitetural (ChatGPT — Ordem 059) | Decisão Consolidada no ADR-001 |
-| :--- | :--- | :--- |
-| **1. Ingestão Omnicanal de Atrito Zero** | Separação formal de `SourceConnection` (sem segredos em texto claro no banco) e normalização em `Signal` com `fingerprint` único e `summaryRedacted`. | **Adotado**: Toda entrada externa gera um `Signal` imutável e deduplicado por `(organizationId, fingerprint)`. OAuth tokens residem apenas em cofre/secret manager externo referenciado por `secretReference`. |
-| **2. Motor de Cadência e Empurrão Ativo** | Score explicável `0–100` parametrizado (30% impacto, 25% urgência, 20% custo de esquecimento, 15% desbloqueio, 10% confiança - penalidade de incerteza) + `CadencePolicy` e `Nudge` persistidos. | **Adotado**: Rituais padrão em `America/Fortaleza` (08:00 Briefing Top 3–5, 13:00 Radar de Desbloqueio máx. 3, Segunda-feira Varredura Anti-Esquecimento) com `quietHours` e `cooldown` obrigatórios. |
-| **3. Orquestração Direta com Agentes** | Separação estrita entre **Control Plane** (PostgreSQL/Prisma) e **Execution Plane** (Connectors + AI-Bridge V2). `ACK` nunca equivale a `DONE`. | **Adotado**: Máquina de estados explícita onde `IN_PROGRESS -> VERIFICATION -> DONE` exige registro na tabela `Evidence` com hash e status de verificação. |
-| **4. Visão 360º (Negócios & Vida Pessoal)** | Segregação de **Vida Pessoal** em Vault Privado (`sensitivity = PERSONAL_VAULT`), isolado de membros comuns do tenant. | **Adotado**: Itens com `sensitivity = PERSONAL_VAULT` exigem `ownerId == session.user.id` além do vínculo organizacional, impedindo exposição acidental a operadores/viewers da empresa. |
-| **5. Anti-Fadiga e Ação em 1 Clique** | Classificação de risco em 4 tiers (`AUTO_READ`, `AUTO_SAFE`, `APPROVAL_REQUIRED`, `PROHIBITED`) e `DecisionRequest` vinculada ao `actionPayloadHash`. | **Adotado**: Nenhuma ação com efeito colateral externo ou despacho na AI-Bridge ocorre sem `DecisionRequest` aprovada pelo usuário autorizado, com validação criptográfica do hash do payload e expiração (`expiresAt`). |
-| **6. Fundação Nativa SaaS Multi-Tenant** | Reuso integral de `Organization`, `OrganizationMembership`, `UserRole`, `Agent`, `Conversation` e `AuditLog` já presentes em `prisma/schema.prisma` (PR #31). | **Adotado**: Evolução 100% aditiva sobre o modelo do PR #31, sem quebrar compatibilidade e preservando os guardas de isolamento `N1-B`. |
+O Master SuperAdmin coordena simultaneamente diversas aplicações de software (`nexosai`, `autista`, `fit`, `books`, `rodrigocosta`, `helpus-fba`), atendimento a clientes, funil de vendas, triagem de e-mails e incubação de novas ideias.
+
+Assistentes de IA puramente reativos dependem que o operador lembre de cada frente e inicie a conversa. O módulo **NexosAI Executive** projeta um **Control Plane Durável** acoplado a um **Execution Plane Governado** para:
+1. Capturar e normalizar sinais de repositórios, deploys, clientes e notas rápidas sob rigoroso isolamento por organização.
+2. Calcular scores explicáveis (`0–100`) que destaquem o custo de esquecimento e o poder de desbloqueio.
+3. Preparar rascunhos ou ordens técnicas prontas sob classificação de risco determinística (`AUTO_READ`, `AUTO_SAFE`, `APPROVAL_REQUIRED`, `PROHIBITED`).
+4. Despachar ordens aprovadas via `OutboxEvent` transacional e exigir **evidência verificada (`Evidence`)** antes de transicionar qualquer item para `DONE`.
 
 ---
 
@@ -37,78 +38,78 @@ Ferramentas tradicionais de IA operam sob paradigma **reativo** (aguardam prompt
 
 ```mermaid
 flowchart TB
-    subgraph TB1["Trust Boundary 1: Fontes Externas Não Confiáveis (Untrusted Inputs)"]
+    subgraph TB1["Trust Boundary 1: Fontes Externas Não Confiáveis (UNTRUSTED_DATA)"]
         EXT_GH["GitHub Webhooks / API\n(PRs, Issues, Commits)"]
         EXT_VC["Vercel API\n(Deploys, Domains)"]
-        EXT_GM["Gmail / Calendar Push\n(Watch 7d + Pub/Sub Opt-in)"]
-        EXT_CRM[" Eventos de Clientes / Vendas"]
+        EXT_GM["Gmail / Calendar Push\n(Opt-in F1B: Watch 7d + Fallback 404)"]
+        EXT_CAP["Captura Manual Estruturada"]
     end
 
-    subgraph TB2["Trust Boundary 2: Execution Plane (Stateless Connectors & Agent Runners)"]
-        ING["Ingestion & Sanitization Worker\n(Valida HMAC, Remove Prompt Injection, Gera Fingerprint)"]
-        LLM_REC["LLM Recommendation Sandbox\n(Apenas sugere resumo/score; ZERO permissão de tool-execution direta)"]
-        BRIDGE_V2["AI-Bridge Local V2Dispatcher\n(mTLS/HMAC Signature, Idempotency, Lease, Anti-Replay)"]
-        AG_RUNNER["Antigravity / ChatGPT Execution Nodes"]
+    subgraph TB2["Trust Boundary 2: Execution Plane (Stateless Connectors, Sandboxed LLM & Runners)"]
+        FF_GATE["Feature Flag & Tenant Policy Gate\n(Deny-by-Default em UI, API, Cron e Worker)"]
+        ING["Ingestion & Normalizer Worker\n(Valida HMAC, Deduplica Fingerprint, Marca UNTRUSTED_DATA)"]
+        LLM_SANDBOX["LLM Advisory Sandbox\n(Somente leitura de texto; ZERO tool-calling de escrita/execução)"]
+        OUTBOX_RELAY["Outbox Relay Worker\n(Consome OutboxEvent com Lease + Backoff + Dead-Letter)"]
+        BRIDGE_V2["AI-Bridge Local V2 Dispatcher\n(Assinatura Mútua, Anti-Replay, Idempotency Key)"]
     end
 
-    subgraph TB3["Trust Boundary 3: Durable Control Plane (PostgreSQL / Prisma Multi-Tenant)"]
-        DB_SIG[("Signal & SourceConnection")]
-        DB_WORK[("WorkItem & CadencePolicy / Nudge")]
-        DB_DEC[("DecisionRequest\n(actionPayloadHash + expiresAt)")]
-        DB_ORD[("ExecutionOrder\n(Outbox + Lease + Retries)")]
-        DB_EVID[("Evidence & ActivityEvent\n(Append-Only Audit)")]
-        DB_VAULT[("Personal Vault Filter\n(ownerId Strict Guard)")]
+    subgraph TB3["Trust Boundary 3: Durable Control Plane (PostgreSQL / Prisma + Composite Tenant FKs + RLS)"]
+        DB_SIG[("SourceConnection & Signal\nComposite FK (id, organizationId)")]
+        DB_WORK[("WorkItem & CadencePolicy / Nudge\nComposite FK (id, organizationId)")]
+        DB_DEC[("DecisionRequest\n(Revisão + Canonical Hash + TTL + Consume-Once)")]
+        DB_OUT[("OutboxEvent & ExecutionOrder\n(Transação ACID Atômica, At-Least-Once)")]
+        DB_EVID[("Evidence & ActivityEvent\n(Append-Only Audit Trail)")]
     end
 
     subgraph TB4["Trust Boundary 4: Superfície Executiva Autenticada (Next.js App Router + NextAuth)"]
-        UI_DAY["Painel 'Meu Dia' & 'Decisões'"]
-        HITL_API["API de Aprovação Contextual\n(Verifica Sessão + RBAC + Payload Hash)"]
+        UI_DAY["Cockpit Executivo (/executive)\nMeu Dia, Decisões, Agentes, Projetos, Clientes"]
+        HITL_API["API de Aprovação em 2 Etapas\n(CSRF + RBAC + Tenant + Confirmação de Hash Canônico)"]
     end
 
-    EXT_GH & EXT_VC & EXT_GM & EXT_CRM --> ING
-    ING -->|"Sinal Sanitizado + Evidência"| DB_SIG
-    DB_SIG --> LLM_REC
-    LLM_REC -->|"Sugestão Estruturada"| DB_WORK
+    EXT_GH & EXT_VC & EXT_GM & EXT_CAP --> FF_GATE
+    FF_GATE --> ING
+    ING -->|"Grava Signal Tenant-Scoped"| DB_SIG
+    DB_SIG --> LLM_SANDBOX
+    LLM_SANDBOX -->|"Sugestão Não-Confiável Validada por Schema"| DB_WORK
     DB_WORK --> UI_DAY
-    UI_DAY -->|"1-Click Approve / Adjust / Snooze"| HITL_API
-    HITL_API -->|"Grava Aprovação Assinada"| DB_DEC
-    DB_DEC -->|"Libera Ordem Aprovada"| DB_ORD
-    DB_ORD -->|"Outbox Poll / Dispatch"| BRIDGE_V2
-    BRIDGE_V2 --> AG_RUNNER
-    AG_RUNNER -->|"ACK -> Progress -> Evidence Hash"| DB_EVID
-    DB_EVID -->|"Valida Conclusão"| DB_WORK
+    UI_DAY -->|"1. Editar (Gera Novo Hash) / 2. Aprovar Hash"| HITL_API
+    HITL_API -->|"BEGIN TX: Grava Decision + ExecutionOrder + OutboxEvent"| DB_DEC
+    DB_DEC -.->|"Mesma Transação ACID"| DB_OUT
+    DB_OUT -->|"SELECT FOR UPDATE SKIP LOCKED"| OUTBOX_RELAY
+    OUTBOX_RELAY --> BRIDGE_V2
+    BRIDGE_V2 -->|"ACK != DONE (Exige Evidência)"| DB_EVID
+    DB_EVID -->|"Verificação Determinística"| DB_WORK
 ```
 
 ---
 
-## 4. Decisões Arquiteturais Chave e Trade-offs
+## 4. Decisões Arquiteturais e Limitações Operacionais Explícitas
 
-### 4.1. Orquestração de Filas e Workflows Duráveis: Transactional Outbox vs. Temporal.io
+### 4.1. Integridade Relacional Multi-Tenant: Chaves Compostas + RLS
+- **Problema**: Incluir apenas `organizationId` em cada tabela permite que um bug de aplicação ou worker associe um `WorkItem` da `Org A` a um `Signal`, `DecisionRequest` ou `BlockedBy WorkItem` pertencente à `Org B`.
 - **Decisão**:
-  - **Fases F1A, F1B e F1C (Piloto Interno e Dogfooding)**: Utilizar **PostgreSQL Transactional Outbox + Lease/Lock Table (`ExecutionOrder` e `Nudge`)** acionados por **Vercel Cron** + Worker dedicado local/híbrido.
-  - **Fase F2 (Escala SaaS B2B Multi-Tenant)**: Avaliar migração do motor de execução para **Temporal.io** caso o volume ultrapasse `10.000 WorkItems ativos/dia` ou exija sagas distribuídas de longa duração entre múltiplos provedores.
-- **Racional / Trade-off**: Introduzir um cluster Temporal.io na Fase F1 aumentaria o custo fixo de infraestrutura e a complexidade operacional antes da validação de produto. O padrão Transactional Outbox com `SELECT ... FOR UPDATE SKIP LOCKED`, `idempotencyKey`, `leaseExpiresAt` e `retries` com backoff exponencial no PostgreSQL/Neon já atende 100% dos requisitos de durabilidade e idempotência para o piloto a custo marginal zero.
+  1. Todas as tabelas pai (`SourceConnection`, `Signal`, `WorkItem`, `DecisionRequest`, `CadencePolicy`, `Evidence`) declaram constraint única composta `@@unique([id, organizationId])`.
+  2. Todas as tabelas filhas referenciam obrigatoriamente o par `(fkId, organizationId)` via `@relation(fields: [fkId, organizationId], references: [id, organizationId])`. Assim, o próprio PostgreSQL rejeita no nível de chave estrangeira qualquer tentativa de vínculo cross-tenant.
+  3. Como defesa em profundidade (Fase F1B/F2), habilitar políticas de **Row-Level Security (RLS)** no PostgreSQL vinculadas à variável de sessão `app.current_organization_id`.
 
-### 4.2. Autoridade do LLM vs. Motor de Políticas Determinístico
-- **Decisão**: O LLM atua **exclusivamente como classificador assistivo e redator de rascunhos/resumos**. Ele **não possui credenciais nem capacidade de invocar ferramentas com efeitos colaterais (`side effects`)**.
-- **Racional / Trade-off**: E-mails externos, issues do GitHub e mensagens de clientes são vetores clássicos de **Indirect Prompt Injection (OWASP LLM01 / Agentic Top 10)**. Ao isolar o LLM de chamadas diretas de API e exigir que toda transição de `APPROVAL_REQUIRED` passe pelo validador determinístico do Control Plane (`DecisionRequest` com verificação de `actionPayloadHash` pelo humano), eliminamos o risco de execução arbitrária induzida por conteúdo externo.
+### 4.2. Isolamento de Dados Pessoais (`PERSONAL_VAULT`) e Adiamento no MVP F1A
+- **Limitação Real**: Filtrar linhas por `sensitivity = PERSONAL_VAULT AND ownerId = :userId` na camada de aplicação protege contra leitura por outros usuários na UI/API, mas **não constitui um cofre criptográfico** — administradores de banco de dados, snapshots de backup no Neon ou logs de query ainda teriam acesso ao texto em claro se armazenado sem cifragem.
+- **Decisão**:
+  1. **Adiamento no MVP F1A**: A ingestão de dados da categoria `PERSONAL` (`PERSONAL_VAULT`) fica **fora do escopo do piloto F1A**, mantendo o foco inicial exclusivamente em projetos de software e itens operacionais de negócios.
+  2. **Requisito para Habilitação Futura (F1B/F2)**: Antes de ativar o `PERSONAL_VAULT`, exigir **Envelope Encryption em nível de aplicação (AEAD AES-256-GCM)** nos campos `title`, `summaryRedacted`, `nextAction` e `rawMetadataJson`, utilizando uma Data Encryption Key (DEK) exclusiva por usuário envelopada por chave mestra externa (KMS) ou derivada de segredo do titular, além de termo de consentimento explícito por fonte.
 
-### 4.3. Isolamento do Cofre Pessoal (`PERSONAL_VAULT`) dentro da Arquitetura Multi-Tenant
-- **Decisão**: Criar o nível de sensibilidade `PERSONAL_VAULT` nas entidades `Signal` e `WorkItem`. Qualquer query a registros com `sensitivity = PERSONAL_VAULT` exige predicado duplo obrigatório no banco: `organizationId = :orgId AND ownerId = :currentUserId`.
-- **Racional / Trade-off**: Permite que o gestor utilize o mesmo painel executivo ("Meu Dia") para compromissos pessoais e empresariais sem jamais expor dados particulares a outros membros (`ADMIN`, `OPERATOR`, `VIEWER`) da mesma `Organization`.
+### 4.3. Transactional Outbox (`OutboxEvent`) com Semântica `At-Least-Once`
+- **Problema**: Atualizar o estado de um `WorkItem` ou `DecisionRequest` e tentar despachar uma chamada HTTP/Bridge fora de um outbox formal causa perda de mensagens ou inconsistência em caso de falha do processo.
+- **Decisão**:
+  1. Toda transição que gere efeito externo (despacho de `ExecutionOrder` ou envio de `Nudge`) insere atomicamente um registro na tabela `OutboxEvent` dentro da **mesma transação de banco (`prisma.$transaction`)**.
+  2. O worker de despacho consome `OutboxEvent` com `SELECT ... FOR UPDATE SKIP LOCKED`, adquirindo um lease temporário (`lockedUntil`).
+  3. **Semântica Real**: O modelo garante entrega **`at-least-once`** (pelo menos uma vez), e não `exactly-once`. Portanto, todo receptor (AI-Bridge Local V2 ou conector de notificação) é obrigado a implementar deduplicação idempotente por `(organizationId, idempotencyKey)`.
 
-### 4.4. Renovação de Watch do Gmail e Reconciliação Periódica
-- **Decisão**: Nas integrações Gmail API Push (`users.watch` via Cloud Pub/Sub), um job de manutenção renova a subscrição a cada **5 dias** (antes do limite de expiração de 7 dias da Google) e executa reconciliação incremental via `historyId` (`syncCursor` em `SourceConnection`).
-- **Racional / Trade-off**: Garante zero perda de sinais mesmo se uma notificação webhook sofrer falha transitória de rede.
+### 4.4. Estimativas Operacionais e Limitações de Provedores (Sem Garantias Absolutas)
 
----
-
-## 5. Custos Estimados e Cronograma de Engenharia (Estimativas Preliminares)
-
-| Fase | Escopo Resumido | Custo Infra Estimado (Mensal) | Janela Estimada |
+| Componente | Custo Estimado (Piloto F1A/F1B) | Limitações Técnicas e Modos de Falha Conhecidos | Estratégia de Mitigação Projetada |
 | :--- | :--- | :--- | :--- |
-| **F0 (Atual)** | Co-design, ADR-001, Schema proposto, Contratos, Wireframes e Backlog em PR Draft separado. | US$ 0 (Design Only) | Concluído nesta entrega |
-| **F1A (Piloto Read-Only)** | Monitoramento de repositórios GitHub/Vercel + Captura manual de ideias/tarefas + Briefing "Meu Dia" persistente (Feature Flag `OFF` por padrão). | US$ 0 (Usa Neon Staging/Free + Vercel atual) | 1 a 2 semanas |
-| **F1B (Conectores Opt-In + Bridge)** | Gmail/Calendar Opt-In, Clientes/Vendas, Rascunhos assistidos e despacho aprovado para AI-Bridge Local V2. | US$ 5 – US$ 20 (Tokens LLM + Pub/Sub leve) | 2 a 3 semanas |
-| **F1C (Dogfooding 30 Dias)** | Uso diário real pelo Master SuperAdmin, calibragem de pesos do score e corte de falsos positivos. | US$ 10 – US$ 25 | 30 dias corridos |
-| **F2 (SaaS Comercial B2B)** | Onboarding self-service por tenant, LGPD/DSAR, quotas/billing e observabilidade multi-tenant. | Escala conforme clientes | Pós-aprovação do Gate F1C |
+| **Neon PostgreSQL (Staging / Free Tier)** | US$ 0 a US$ 19/mês (caso escale para plano Launch) | Plano Free possui teto de **0.5 GB de armazenamento**, limite mensal de compute hours e latência de *cold start* (~500ms–2s após autosuspend). | Índices enxutos, retenção limitada de payloads brutos (`rawMetadataJson` truncado), e paginação estrita. Se compute hours excederem 80% da franquia, requer upgrade aprovado para plano pago. |
+| **Vercel Cron & Serverless Functions** | Incluso no plano atual (sujeito a limites de invocação/duração) | Vercel Cron no plano Hobby/Pro possui limites de frequência e timeout de execução por invocação (10s a 60s/300s conforme plano). | Workers processam lotes pequenos e limitados (`LIMIT 20` por execução) com cursor persistido, evitando timeouts de função. |
+| **Gmail API Push (`users.watch` + Pub/Sub)** | US$ 0 a US$ 5/mês (Pub/Sub + tokens de resumo) | 1. Subscrição `watch` expira obrigatoriamente em no máximo **7 dias**.<br>2. O cursor `historyId` pode expirar no Gmail retornando **`HTTP 404 Not Found`** em `users.history.list`. | 1. Job de renovação preventiva a cada 5 dias.<br>2. Tratamento determinístico de `HTTP 404` no `historyId`: aciona fallback automático de **reconciliação por janela temporal** (`q: after:<lastSyncTimestamp>`) com deduplicação por `fingerprint`. |
+| **Inferência LLM (Classificação/Resumo)** | US$ 5 a US$ 25/mês (dependendo do volume de sinais) | Rate limits (RPM/TPM), indisponibilidade transitória da API e alucinação de prioridades. | O cálculo base do `priorityScore` funciona com heurísticas determinísticas mesmo se o LLM estiver offline; o LLM apenas enriquece o resumo textual com orçamento diário de tokens por tenant. |
