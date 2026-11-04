@@ -1,17 +1,18 @@
-# Proposta de Schema Prisma: NexosAI Executive (Control Plane Durável — Revisão v1.1 Ordem 060)
+# Proposta de Schema Prisma: NexosAI Executive (Control Plane Durável — Revisão v1.2 Fechamento F0 Ordem 061)
 
-- **Status**: PROPOSTA DOCUMENTAL (Fase F0 — **Nenhuma migration executada em banco real ou no PR #31**)
-- **Ordem de Referência**: `HU-HUB-ORDER060-EXECUTIVE-ADR-HARDENING-20261104`
+- **Status**: PROPOSTA DOCUMENTAL VALIDADA (Fase F0 — **Nenhuma migration executada em banco real ou no PR #31; F1A aguarda Decisão D1**)
+- **Ordens de Referência**: `HU-HUB-ORDER060-EXECUTIVE-ADR-HARDENING-20261104`, `HU-HUB-ORDER061-NEXOSAI-EXECUTIVE-F0-REVIEW-CLOSURE-20261104`
 - **Compatibilidade**: Estende de forma aditiva os modelos existentes em [`prisma/schema.prisma`](../../prisma/schema.prisma) (`User`, `Organization`, `OrganizationMembership`, `Agent`, `Node`, `AuditLog`).
 
 ---
 
-## 1. Garantias de Integridade Relacional Multi-Tenant (Hardening H-01)
+## 1. Garantias de Integridade Relacional Multi-Tenant e Gate RLS desde F1A (Hardening H-01 & Ajuste Residual 1)
 
-Para impedir que qualquer worker, endpoint ou update malicioso associe registros de organizações diferentes (ex.: um `WorkItem` da `Org A` apontando para um `Signal`, `DecisionRequest` ou `blockedById` da `Org B`):
+Como a Fase F1A já persistirá registros tenant-scoped (`Signal`, `WorkItem`, `CadencePolicy`, `Nudge`, `ActivityEvent`), o isolamento nunca é presumido apenas pelo schema Prisma. O Gate de Isolamento F1A exige **três barreiras simultâneas desde o primeiro commit de F1A**:
 1. **Chave Única Composta nos Pais**: Todos os modelos pai tenant-scoped declaram `@@unique([id, organizationId])`.
 2. **Foreign Keys Compostas nos Filhos**: Todas as relações internas usam `fields: [<fkId>, organizationId], references: [id, organizationId]`. O PostgreSQL bloqueia estruturalmente qualquer cruzamento de `organizationId` em `INSERT` ou `UPDATE`.
-3. **Defesa Adicional (PostgreSQL RLS)**: Nas migrations da Fase F1B/F2, as tabelas receberão `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` com política `organizationId = current_setting('app.current_organization_id', true)`.
+3. **PostgreSQL Row-Level Security (`ENABLE` + `FORCE ROW LEVEL SECURITY`) já na Fase F1A**:
+   - **Limitação explícita documentada**: No PostgreSQL/Neon, quando a aplicação conecta com o usuário dono das tabelas (*table owner*), `ENABLE ROW LEVEL SECURITY` sozinho é ignorado pelo SGBD. Por isso, a migration de F1A aplicará obrigatoriamente **`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`** seguido de **`ALTER TABLE ... FORCE ROW LEVEL SECURITY`**, com política restritiva `organizationId = current_setting('app.current_organization_id', true)` (que falha fechado retornando `0` linhas se a variável de sessão não estiver definida na transação).
 
 ---
 
@@ -473,3 +474,78 @@ model ActivityEvent {
   @@index([organizationId, workItemId, occurredAt(sort: Desc)])
 }
 ```
+
+---
+
+## 4. Prova Reprodutível de Validação (`prisma validate`) com Schema Agregado (Ajuste Residual 3)
+
+Para garantir que qualquer auditor ou pipeline de CI possa reproduzir a validação sintática e relacional sem tocar em `prisma/schema.prisma` do PR #31 e sem utilizar credenciais reais:
+
+### 4.1. Relações Reversas Agregadas aos Modelos Existentes (`prisma/schema.prisma`)
+Ao agregar o bloco acima ao [`prisma/schema.prisma`](../../prisma/schema.prisma) existente, os três modelos pai atuais recebem apenas as seguintes listas de relação reversa:
+- Em `model User`:
+  ```prisma
+  ownedWorkItems  WorkItem[]
+  decidedRequests DecisionRequest[]
+  ```
+- Em `model Organization`:
+  ```prisma
+  executiveWorkspace ExecutiveWorkspace?
+  sourceConnections  SourceConnection[]
+  signals            Signal[]
+  workItems          WorkItem[]
+  decisionRequests   DecisionRequest[]
+  executionOrders    ExecutionOrder[]
+  outboxEvents       OutboxEvent[]
+  cadencePolicies    CadencePolicy[]
+  nudges             Nudge[]
+  evidences          Evidence[]
+  activityEvents     ActivityEvent[]
+  ```
+- Em `model Agent`:
+  ```prisma
+  executionOrders ExecutionOrder[]
+  ```
+
+### 4.2. Ambiente, Comando e Saída Verificada (Sem Segredos)
+- **Versão do Prisma CLI / Engine**:
+  - `prisma`: `6.19.3`
+  - `@prisma/client`: `6.19.3`
+  - `Node.js`: `v24.18.0`
+  - `Schema Engine`: `schema-engine-cli c2990dca591cba766e3b7ef5d9e8a84796e47ab7`
+- **Comando Executado (com `DATABASE_URL` sintética não-sensível)**:
+  ```powershell
+  $env:DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+  .\node_modules\.bin\prisma.cmd validate --schema="temp_validate.prisma"
+  ```
+- **Saída Literal**:
+  ```text
+  Prisma schema loaded from temp_validate.prisma
+  The schema at temp_validate.prisma is valid 🚀
+  Exit Code: 0
+  ```
+
+### 4.3. Cenários de Integridade Cobertos pelo Schema Validado
+1. **Cross-Tenant Signal -> SourceConnection**: Bloqueado por `source @relation(fields: [sourceId, organizationId], references: [id, organizationId])`.
+2. **Cross-Tenant WorkItem -> Signal**: Bloqueado por `sourceSignal @relation(fields: [sourceSignalId, organizationId], references: [id, organizationId])`.
+3. **Cross-Tenant WorkItem -> BlockedBy WorkItem**: Auto-relação protegida por `blockedBy @relation("WorkItemDependency", fields: [blockedById, organizationId], references: [id, organizationId])`.
+4. **Cross-Tenant DecisionRequest / ExecutionOrder / Nudge / Evidence / ActivityEvent -> WorkItem**: Todos exigem par composto `(workItemId, organizationId)`.
+5. **Cross-Tenant ExecutionOrder -> DecisionRequest & Evidence**: Ambos exigem pares compostos `(decisionRequestId, organizationId)` e `(evidenceId, organizationId)`.
+
+---
+
+## 5. Template DDL de Row-Level Security (`FORCE ROW LEVEL SECURITY`) para o Gate F1A
+
+Quando a **Decisão Executiva D1** autorizar a abertura do PR de implementação da Fase F1A, a migration SQL incluirá obrigatoriamente:
+
+```sql
+-- Aplicado a todas as tabelas tenant-scoped do NexosAI Executive já na Fase F1A:
+ALTER TABLE "ExecutiveWorkspace" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ExecutiveWorkspace" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_policy ON "ExecutiveWorkspace"
+  USING ("organizationId" = current_setting('app.current_organization_id', true))
+  WITH CHECK ("organizationId" = current_setting('app.current_organization_id', true));
+
+-- Repetido para SourceConnection, Signal, WorkItem, DecisionRequest, ExecutionOrder, OutboxEvent, CadencePolicy, Nudge, Evidence, ActivityEvent.
+```
+

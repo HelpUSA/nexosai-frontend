@@ -1,24 +1,24 @@
 # ADR-001: Arquitetura do Módulo NexosAI Executive (Gerente Geral Executivo Proativo)
 
-- **Status**: PROPOSTO — REVISÃO HARDENING ORDEM 060 (Fase F0 — Design & Co-Design Documental; **Não equivale à aprovação D1 nem autoriza início de F1A**)
-- **Data**: 2026-11-04 (Revisão v1.1 — Hardening Ordem 060)
-- **Ordens de Referência**: `HU-HUB-ORDER059-NEXOSAI-EXECUTIVE-CODESIGN-20261104`, `HU-HUB-ORDER060-EXECUTIVE-ADR-HARDENING-20261104`
-- **Linhagem de Branch (Stacked PR Dependency)**: Este PR Draft ([PR #32](https://github.com/HelpUSA/nexosai-frontend/pull/32), branch `docs/nexosai-executive-codesign-order059-20261104`) é **stacked** diretamente sobre a branch candidata do [PR #31](https://github.com/HelpUSA/nexosai-frontend/pull/31) (`test/g3c-strict-release-candidate-20261103`, HEAD `bb1830976ac9a16066400b0839a39be83cac8bef`), contendo exclusivamente 4 arquivos documentais em `docs/executive/`. Não pode ser mergeado antes da deliberação do PR #31 e do aceite executivo formal D1.
+- **Status**: FECHAMENTO DOCUMENTAL F0 — REVISÃO v1.2 ORDEM 061 (**Aguardando Decisão Executiva D1; F1A NÃO INICIADA e NÃO AUTORIZADA ainda**)
+- **Data**: 2026-11-04 (Revisão v1.2 — Fechamento F0 Ordem 061)
+- **Ordens de Referência**: `HU-HUB-ORDER059-NEXOSAI-EXECUTIVE-CODESIGN-20261104`, `HU-HUB-ORDER060-EXECUTIVE-ADR-HARDENING-20261104`, `HU-HUB-ORDER061-NEXOSAI-EXECUTIVE-F0-REVIEW-CLOSURE-20261104`
+- **Linhagem de Branch (Stacked PR Dependency)**: Este PR Draft ([PR #32](https://github.com/HelpUSA/nexosai-frontend/pull/32), branch `docs/nexosai-executive-codesign-order059-20261104`) é **stacked** diretamente sobre a branch candidata do [PR #31](https://github.com/HelpUSA/nexosai-frontend/pull/31) (`test/g3c-strict-release-candidate-20261103`, HEAD `bb1830976ac9a16066400b0839a39be83cac8bef`), contendo exclusivamente 4 arquivos documentais em `docs/executive/`. Qualquer implementação futura da Fase F1A (após autorização D1) ocorrerá em **novo Draft PR separado**, jamais misturando código de runtime no PR #32 ou no PR #31.
 
 ---
 
-## 1. Matriz de Conformidade e Mudanças da Revisão Técnica (Ordem 060 — `PASS / OPEN / DECISION`)
+## 1. Matriz Consolidada de Fechamento F0 (Ordens 059, 060 e 061 — `PASS / OPEN / DECISION`)
 
-| Item | Exigência de Hardening (Ordem 060) | Status | Resolução Documental Aplicada (v1.1) |
+| Item | Controle / Ajuste Residual (Ordens 060 & 061) | Status | Resolução Documental Consolidada (v1.2) |
 | :--- | :--- | :---: | :--- |
-| **H-01** | **Integridade Relacional Multi-Tenant (Composite FKs)** | **PASS** | Todas as relações entre entidades tenant-scoped em `SCHEMA-PROPOSAL-NEXOSAI-EXECUTIVE.prisma.md` agora declaram `@@unique([id, organizationId])` nas tabelas pai e chaves estrangeiras compostas `fields: [<fkId>, organizationId], references: [id, organizationId]` nas tabelas filhas, impedindo associação cruzada entre organizações no nível do SGBD, somado a defesa em profundidade via PostgreSQL RLS. |
-| **H-02** | **Isolamento Real do Personal Vault & Escopo MVP F1A** | **DECISION / PASS** | Explicitado que `sensitivity = PERSONAL_VAULT` + filtro `ownerId` é apenas controle lógico de aplicação e **não protege** contra acesso de infraestrutura, dumps ou backups sem criptografia de envelope (AEAD AES-256-GCM com DEK por usuário) ou segregação de storage. **Ingestão de Vida Pessoal ADIADA para fora do MVP F1A** até revisão e aprovação específica de privacidade/criptografia. |
-| **H-03** | **Outbox Transacional Formal (`OutboxEvent` & At-Least-Once)** | **PASS** | Adicionada a tabela explícita `OutboxEvent` gravada na mesma transação ACID das mutações de `WorkItem`/`DecisionRequest`/`ExecutionOrder`. Semântica declarada como **`at-least-once`** (não `exactly-once`), exigindo deduplicação idempotente no receptor, lease com expiração, retries com backoff exponencial + jitter e fila `DEAD_LETTER`. |
-| **H-04** | **Aprovação de Payload Editado (`ADJUSTED_AND_APPROVED`)** | **PASS** | Fluxo corrigido para **duas etapas obrigatórias**: se o executivo editar um rascunho/ordem, o sistema persiste uma nova revisão (`revisionNumber + 1`), recalcula o `canonicalPayloadHash` sobre o JSON canônico RFC 8785, exibe o diff visual e exige confirmação explícita vinculada ao **novo hash** (com TTL estrito, token `consume-once`, proteção CSRF e checagem RBAC + tenant). |
-| **H-05** | **Defesa contra Prompt Injection Semântico** | **PASS** | Explicitado que truncamento/remoção de HTML (`summaryRedacted`) **não elimina comandos maliciosos semânticos** em linguagem natural. Todo dado externo é marcado como `UNTRUSTED_DATA` em envelopes XML/JSON segregados, o LLM opera com **zero tool-calling de escrita/execução**, e o Policy Engine determinístico bloqueia qualquer transição sem `DecisionRequest` humana. |
-| **H-06** | **Revisão de Estimativas de Custo e Garantias Operacionais** | **PASS** | Removidas afirmações absolutas ("custo zero", "100% dos requisitos", "zero perda"). Documentados limites reais do Neon Free Tier (0.5 GB storage, compute hours/autosuspend), limites de invocação do Vercel Cron e expiração de `historyId` do Gmail (`HTTP 404`), que exige fallback de reconciliação por janela de tempo. |
-| **H-07** | **Gates de Feature Flag (UI, API, Cron, Workers) e Independência de DNS** | **PASS** | Definido gate global e por tenant (`NEXOSAI_EXECUTIVE_ENABLED` + `ExecutiveWorkspace.featureFlagEnabled = false` por padrão) que nega execução em **4 superfícies**: UI, rotas de API, endpoints de Cron e Workers de fila. Testes unitários e de integração F1A rodam localmente/CI sem depender do DNS externo da Ordem 058. Nenhuma migration será criada ou rodada antes da Decisão D1. |
-| **H-08** | **Cadências, Timezone/DST, Rate Limit e Pausa como Defaults Propostos** | **DECISION / PASS** | Horários (`08:00`, `13:00`, Segunda `08:30`, `quietHours 22:00–07:00` em `America/Fortaleza`) tratados estritamente como **defaults propostos sujeitos à Decisão D2**. Especificadas regras de conversão IANA/DST, deduplicação por janela de agendamento, rate limit e pausa temporária (`pauseUntil`). |
+| **H-01 / R-61.1** | **Integridade Relacional Multi-Tenant, Threat Model F1A e Gate RLS desde F1A** | **PASS** | Chaves compostas `@@unique([id, organizationId])` e FKs compostas `@relation(fields: [<fkId>, organizationId], references: [id, organizationId])` validadas no `prisma validate`. **Ajuste Ordem 061**: como F1A já persiste `WorkItem` e `Signal` tenant-scoped, **PostgreSQL RLS (`ENABLE` + `FORCE ROW LEVEL SECURITY`) é antecipado como Gate Obrigatório já na Fase F1A** (junto ao guard de aplicação `N1-B` e às FKs compostas), com bateria adversarial real em PostgreSQL efêmero no CI. |
+| **H-02** | **Isolamento do Personal Vault & Escopo MVP F1A** | **DECISION / PASS** | Explicitado que filtro lógico (`ownerId`) não substitui Envelope Encryption (AEAD AES-256-GCM por usuário) contra acessos de infra/backups. **Ingestão de Vida Pessoal ADIADA para fora do MVP F1A** (`personalVaultEnabled = false`). |
+| **H-03** | **Outbox Transacional Formal (`OutboxEvent` & At-Least-Once)** | **PASS** | Modelo explícito `OutboxEvent` na mesma transação ACID (`prisma.$transaction`), semântica `at-least-once`, lease `FOR UPDATE SKIP LOCKED`, backoff exponencial + jitter, `DEAD_LETTER` e deduplicação idempotente no receptor. |
+| **H-04** | **Aprovação de Payload Editado em 2 Etapas (`ADJUSTED_AND_APPROVED`)** | **PASS** | Edição gera nova revisão (`revisionNumber + 1`), recalcula `canonicalPayloadHash` (RFC 8785), exibe diff estruturado e exige confirmação explícita do novo hash (`consume-once`, TTL, CSRF, RBAC+tenant). |
+| **H-05** | **Defesa contra Prompt Injection Semântico** | **PASS** | Dados externos isolados como `UNTRUSTED_DATA` (`untrustedTextSummary`), LLM em sandbox sem ferramentas de escrita/execução (`tools: []`), e Policy Engine determinístico exigindo `DecisionRequest` humana. |
+| **H-06 / R-61.2** | **Custos, Limites Reais e Detecção de Lacunas (`Gap Detection`) no Gmail 404** | **PASS** | **Ajuste Ordem 061**: Removida qualquer promessa de reconciliação "sem perder sinais" após expiração de `historyId` (`HTTP 404`). Especificado protocolo de **Gap Detection** (`HISTORY_GAP_DETECTED`), janela temporal ajustável de recuperação, registro de evidência da lacuna no `AuditLog`/`ActivityEvent` e alerta explícito na UI quando mensagens deletadas durante a indisponibilidade não puderem ser recuperadas. |
+| **H-07 / R-61.3 / R-61.4** | **Prova Reprodutível `prisma validate`, Gate F1A em Novo Draft PR e Checklist GO/NO-GO** | **PASS** | Documentada reprodução exata do `prisma validate` (`prisma@6.19.3`, Node `v24.18.0`, env dummy não-sensível, Exit `0`). Definido Checklist GO/NO-GO completo para o futuro PR isolado da Fase F1A (que permanece `NOT_STARTED` até decisão D1). |
+| **H-08 / D1–D4** | **Decisões Exclusivas do Master SuperAdmin (Sem Presunção de Aceite)** | **DECISION** | **D1** (Aceite do ADR-001 e autorização para iniciar F1A), **D2** (Horários propostos `08:00`/`13:00`/Seg `08:30` e `quietHours 22:00–07:00` em `America/Fortaleza`), **D3** (Ordem 058 DNS Cloudflare `WAITING_FOR_CLOUDFLARE_ZONE_ADMIN_RECORD`) e **D4** (Termo B1 `NOT_SIGNED`). |
 
 ---
 
@@ -26,7 +26,7 @@
 
 O Master SuperAdmin coordena simultaneamente diversas aplicações de software (`nexosai`, `autista`, `fit`, `books`, `rodrigocosta`, `helpus-fba`), atendimento a clientes, funil de vendas, triagem de e-mails e incubação de novas ideias.
 
-Assistentes de IA puramente reativos dependem que o operador lembre de cada frente e inicie a conversa. O módulo **NexosAI Executive** projeta um **Control Plane Durável** acoplado a um **Execution Plane Governado** para:
+O módulo **NexosAI Executive** projeta um **Control Plane Durável** acoplado a um **Execution Plane Governado** para:
 1. Capturar e normalizar sinais de repositórios, deploys, clientes e notas rápidas sob rigoroso isolamento por organização.
 2. Calcular scores explicáveis (`0–100`) que destaquem o custo de esquecimento e o poder de desbloqueio.
 3. Preparar rascunhos ou ordens técnicas prontas sob classificação de risco determinística (`AUTO_READ`, `AUTO_SAFE`, `APPROVAL_REQUIRED`, `PROHIBITED`).
@@ -41,7 +41,7 @@ flowchart TB
     subgraph TB1["Trust Boundary 1: Fontes Externas Não Confiáveis (UNTRUSTED_DATA)"]
         EXT_GH["GitHub Webhooks / API\n(PRs, Issues, Commits)"]
         EXT_VC["Vercel API\n(Deploys, Domains)"]
-        EXT_GM["Gmail / Calendar Push\n(Opt-in F1B: Watch 7d + Fallback 404)"]
+        EXT_GM["Gmail / Calendar Push\n(Opt-in F1B: Watch 7d + Gap Detection 404)"]
         EXT_CAP["Captura Manual Estruturada"]
     end
 
@@ -53,9 +53,9 @@ flowchart TB
         BRIDGE_V2["AI-Bridge Local V2 Dispatcher\n(Assinatura Mútua, Anti-Replay, Idempotency Key)"]
     end
 
-    subgraph TB3["Trust Boundary 3: Durable Control Plane (PostgreSQL / Prisma + Composite Tenant FKs + RLS)"]
-        DB_SIG[("SourceConnection & Signal\nComposite FK (id, organizationId)")]
-        DB_WORK[("WorkItem & CadencePolicy / Nudge\nComposite FK (id, organizationId)")]
+    subgraph TB3["Trust Boundary 3: Durable Control Plane (PostgreSQL / Prisma + Composite Tenant FKs + FORCE RLS)"]
+        DB_SIG[("SourceConnection & Signal\nComposite FK (id, organizationId) + RLS")]
+        DB_WORK[("WorkItem & CadencePolicy / Nudge\nComposite FK (id, organizationId) + RLS")]
         DB_DEC[("DecisionRequest\n(Revisão + Canonical Hash + TTL + Consume-Once)")]
         DB_OUT[("OutboxEvent & ExecutionOrder\n(Transação ACID Atômica, At-Least-Once)")]
         DB_EVID[("Evidence & ActivityEvent\n(Append-Only Audit Trail)")]
@@ -85,31 +85,30 @@ flowchart TB
 
 ## 4. Decisões Arquiteturais e Limitações Operacionais Explícitas
 
-### 4.1. Integridade Relacional Multi-Tenant: Chaves Compostas + RLS
-- **Problema**: Incluir apenas `organizationId` em cada tabela permite que um bug de aplicação ou worker associe um `WorkItem` da `Org A` a um `Signal`, `DecisionRequest` ou `BlockedBy WorkItem` pertencente à `Org B`.
-- **Decisão**:
-  1. Todas as tabelas pai (`SourceConnection`, `Signal`, `WorkItem`, `DecisionRequest`, `CadencePolicy`, `Evidence`) declaram constraint única composta `@@unique([id, organizationId])`.
-  2. Todas as tabelas filhas referenciam obrigatoriamente o par `(fkId, organizationId)` via `@relation(fields: [fkId, organizationId], references: [id, organizationId])`. Assim, o próprio PostgreSQL rejeita no nível de chave estrangeira qualquer tentativa de vínculo cross-tenant.
-  3. Como defesa em profundidade (Fase F1B/F2), habilitar políticas de **Row-Level Security (RLS)** no PostgreSQL vinculadas à variável de sessão `app.current_organization_id`.
+### 4.1. Integridade Relacional Multi-Tenant e Defesa em 3 Camadas desde a Fase F1A (Ajuste Residual 1)
+- **Problema**: A Fase F1A já persiste `Signal`, `WorkItem`, `CadencePolicy`, `Nudge` e `ActivityEvent` por organização. Assumir isolamento apenas pelo schema Prisma ou adiar RLS para fases posteriores deixaria a Fase F1A dependente de uma única barreira.
+- **Decisão (Gate Obrigatório F1A)**:
+  1. **Camada 1 — Application Guard (`N1-B`)**: Toda rota e worker valida `OrganizationMembership` ativa (`status = ACTIVE`) e injeta explicitamente `organizationId` em todas as queries.
+  2. **Camada 2 — SGBD Composite Foreign Keys**: Todas as tabelas pai declaram `@@unique([id, organizationId])` e todas as tabelas filhas referenciam `fields: [<fkId>, organizationId], references: [id, organizationId]`, tornando impossível no nível relacional associar registros de organizações distintas.
+  3. **Camada 3 — PostgreSQL Row-Level Security (`FORCE ROW LEVEL SECURITY`) desde F1A**:
+     - **Limitação explícita do Postgres/Neon**: Em bancos onde a aplicação conecta com o role proprietário da tabela (*table owner*), um simples `ENABLE ROW LEVEL SECURITY` é ignorado pelo SGBD a menos que **`ALTER TABLE ... FORCE ROW LEVEL SECURITY`** seja aplicado e o role não possua o atributo `BYPASSRLS`.
+     - Portanto, na Fase F1A, todas as tabelas novas terão `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` e um helper transacional `withTenantRlsContext(orgId, tx)` que executa `SELECT set_config('app.current_organization_id', $1, true)` no início de cada transação, validado por testes adversariais reais em banco PostgreSQL efêmero no CI.
 
 ### 4.2. Isolamento de Dados Pessoais (`PERSONAL_VAULT`) e Adiamento no MVP F1A
-- **Limitação Real**: Filtrar linhas por `sensitivity = PERSONAL_VAULT AND ownerId = :userId` na camada de aplicação protege contra leitura por outros usuários na UI/API, mas **não constitui um cofre criptográfico** — administradores de banco de dados, snapshots de backup no Neon ou logs de query ainda teriam acesso ao texto em claro se armazenado sem cifragem.
+- **Limitação Real**: Filtrar linhas por `sensitivity = PERSONAL_VAULT AND ownerId = :userId` na camada de aplicação não impede leitura por administradores de infraestrutura, snapshots de backup ou dumps de banco.
 - **Decisão**:
-  1. **Adiamento no MVP F1A**: A ingestão de dados da categoria `PERSONAL` (`PERSONAL_VAULT`) fica **fora do escopo do piloto F1A**, mantendo o foco inicial exclusivamente em projetos de software e itens operacionais de negócios.
-  2. **Requisito para Habilitação Futura (F1B/F2)**: Antes de ativar o `PERSONAL_VAULT`, exigir **Envelope Encryption em nível de aplicação (AEAD AES-256-GCM)** nos campos `title`, `summaryRedacted`, `nextAction` e `rawMetadataJson`, utilizando uma Data Encryption Key (DEK) exclusiva por usuário envelopada por chave mestra externa (KMS) ou derivada de segredo do titular, além de termo de consentimento explícito por fonte.
+  1. **Adiamento no MVP F1A**: A ingestão de dados `PERSONAL` (`PERSONAL_VAULT`) permanece **desativada e bloqueada (`HTTP 403`) no MVP F1A**.
+  2. **Requisito para Habilitação Futura (F1B/F2)**: Exigir **Envelope Encryption em nível de aplicação (AEAD AES-256-GCM)** com Data Encryption Key (DEK) exclusiva por usuário e consentimento explícito por fonte.
 
 ### 4.3. Transactional Outbox (`OutboxEvent`) com Semântica `At-Least-Once`
-- **Problema**: Atualizar o estado de um `WorkItem` ou `DecisionRequest` e tentar despachar uma chamada HTTP/Bridge fora de um outbox formal causa perda de mensagens ou inconsistência em caso de falha do processo.
-- **Decisão**:
-  1. Toda transição que gere efeito externo (despacho de `ExecutionOrder` ou envio de `Nudge`) insere atomicamente um registro na tabela `OutboxEvent` dentro da **mesma transação de banco (`prisma.$transaction`)**.
-  2. O worker de despacho consome `OutboxEvent` com `SELECT ... FOR UPDATE SKIP LOCKED`, adquirindo um lease temporário (`lockedUntil`).
-  3. **Semântica Real**: O modelo garante entrega **`at-least-once`** (pelo menos uma vez), e não `exactly-once`. Portanto, todo receptor (AI-Bridge Local V2 ou conector de notificação) é obrigado a implementar deduplicação idempotente por `(organizationId, idempotencyKey)`.
+- Toda transição que gere efeito externo insere atomicamente um registro em `OutboxEvent` na **mesma transação ACID (`prisma.$transaction`)**.
+- O modelo garante entrega **`at-least-once`** (não `exactly-once`), exigindo deduplicação idempotente por `(organizationId, idempotencyKey)` no receptor.
 
-### 4.4. Estimativas Operacionais e Limitações de Provedores (Sem Garantias Absolutas)
+### 4.4. Estimativas Operacionais, Limites de Provedores e Gap Detection no Gmail (Ajuste Residual 2)
 
-| Componente | Custo Estimado (Piloto F1A/F1B) | Limitações Técnicas e Modos de Falha Conhecidos | Estratégia de Mitigação Projetada |
+| Componente | Custo Estimado (Piloto F1A/F1B) | Limitações Técnicas e Modos de Falha Conhecidos | Estratégia de Mitigação e Detecção de Lacunas |
 | :--- | :--- | :--- | :--- |
-| **Neon PostgreSQL (Staging / Free Tier)** | US$ 0 a US$ 19/mês (caso escale para plano Launch) | Plano Free possui teto de **0.5 GB de armazenamento**, limite mensal de compute hours e latência de *cold start* (~500ms–2s após autosuspend). | Índices enxutos, retenção limitada de payloads brutos (`rawMetadataJson` truncado), e paginação estrita. Se compute hours excederem 80% da franquia, requer upgrade aprovado para plano pago. |
-| **Vercel Cron & Serverless Functions** | Incluso no plano atual (sujeito a limites de invocação/duração) | Vercel Cron no plano Hobby/Pro possui limites de frequência e timeout de execução por invocação (10s a 60s/300s conforme plano). | Workers processam lotes pequenos e limitados (`LIMIT 20` por execução) com cursor persistido, evitando timeouts de função. |
-| **Gmail API Push (`users.watch` + Pub/Sub)** | US$ 0 a US$ 5/mês (Pub/Sub + tokens de resumo) | 1. Subscrição `watch` expira obrigatoriamente em no máximo **7 dias**.<br>2. O cursor `historyId` pode expirar no Gmail retornando **`HTTP 404 Not Found`** em `users.history.list`. | 1. Job de renovação preventiva a cada 5 dias.<br>2. Tratamento determinístico de `HTTP 404` no `historyId`: aciona fallback automático de **reconciliação por janela temporal** (`q: after:<lastSyncTimestamp>`) com deduplicação por `fingerprint`. |
-| **Inferência LLM (Classificação/Resumo)** | US$ 5 a US$ 25/mês (dependendo do volume de sinais) | Rate limits (RPM/TPM), indisponibilidade transitória da API e alucinação de prioridades. | O cálculo base do `priorityScore` funciona com heurísticas determinísticas mesmo se o LLM estiver offline; o LLM apenas enriquece o resumo textual com orçamento diário de tokens por tenant. |
+| **Neon PostgreSQL (Staging / Free Tier)** | US$ 0 a US$ 19/mês (caso escale para plano Launch) | Plano Free possui teto de **0.5 GB de armazenamento**, limite mensal de compute hours e latência de *cold start* (~500ms–2s). | Índices enxutos, retenção limitada de payloads brutos e paginação estrita. |
+| **Vercel Cron & Serverless Functions** | Incluso no plano atual (sujeito a limites de invocação/duração) | Limites de frequência e timeout de execução por invocação (10s a 60s/300s). | Workers processam lotes curtos (`LIMIT 20` por execução) com cursor persistido. |
+| **Gmail API Push (`users.watch` + Fallback `historyId 404`)** | US$ 0 a US$ 5/mês (Pub/Sub + tokens de resumo) | 1. Subscrição `watch` expira em no máximo **7 dias**.<br>2. Se `historyId` expirar (`HTTP 404 Not Found`) ou houver indisponibilidade prolongada, **a recuperação integral (100% lossless) NÃO é garantida** (ex.: e-mails recebidos e permanentemente deletados durante o período offline ou fora da janela máxima de busca não podem ser reconstituídos). | 1. Renovação preventiva a cada 5 dias.<br>2. **Protocolo de Gap Detection (`HISTORY_GAP_DETECTED`)**: Ao receber `HTTP 404`, o sistema registra o intervalo exato da lacuna `[lastSyncAt, now]` em `ActivityEvent`/`AuditLog` (`WARN`), executa busca de melhor esforço (`q: after:<epoch>`) em janela configurável (ex.: 7–14 dias), atualiza `syncCursor` para o novo `historyId` e exibe **alerta explícito de lacuna de sincronização** na UI para ciência humana. |
+| **Inferência LLM (Classificação/Resumo)** | US$ 5 a US$ 25/mês | Rate limits (RPM/TPM), indisponibilidade transitória e alucinação. | Cálculo de `priorityScore` opera com fallback 100% determinístico caso a API do LLM falhe. |
