@@ -317,7 +317,28 @@ try {
   assert.doesNotMatch(auditHtml, /helpus\.ecommerce@gmail\.com/);
   console.log('VERIFIED_CASE_7: Audit Page real HTTP 403 and authorized 200 (3/3 passed)');
 
-  console.log('ALL_POSTGRESQL_AUTHENTICATED_E2E_CASES_VERIFIED: 17/17 ASSERCOES CONFIRMADAS');
+
+  // 3.14: Executive Page & API fail closed by default when NEXOSAI_EXECUTIVE_ENABLED is OFF
+  const execUnauth = await fetch(`${host}/executive`, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
+  assert.equal(execUnauth.status, 307, 'Unauthenticated /executive must redirect 307');
+  assert.match(execUnauth.headers.get('location') || '', /\/login\?callbackUrl=%2Fexecutive/);
+
+  const execPageDefaultOff = await fetch(`${host}/executive?organizationId=${orgA.id}`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(execPageDefaultOff.status, 403, 'Executive page must fail closed 403 when global flag is OFF');
+
+  const execApiDefaultOff = await fetch(`${host}/api/orgs/${orgA.id}/executive/briefing`, {
+    headers: { cookie: cookieAdminA },
+    signal: AbortSignal.timeout(5000),
+  });
+  assert.equal(execApiDefaultOff.status, 403, 'Executive API must fail closed 403 when global flag is OFF');
+  const execApiDefaultOffBody = await execApiDefaultOff.json();
+  assert.equal(execApiDefaultOffBody.error, 'EXECUTIVE_MODULE_DISABLED');
+  console.log('VERIFIED_EXECUTIVE_FAIL_CLOSED_DEFAULT_OFF: 3/3 passed');
+
+  console.log('ALL_POSTGRESQL_AUTHENTICATED_E2E_CASES_VERIFIED: 20/20 ASSERCOES CONFIRMADAS');
 
   // Isolated, reversible fault injection against the disposable PostgreSQL16 CI database only.
   // This establishes a true HTTP failure response instead of erroneously rendering an empty audit trail.

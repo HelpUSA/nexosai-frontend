@@ -96,12 +96,17 @@ model User {
   auditLogs     AuditLog[]
   createdAgents Agent[]
   memberships   OrganizationMembership[]
+  createdExecutiveWorkItems    WorkItem[]        @relation("WorkItemCreator")
+  ownedExecutiveWorkItems      WorkItem[]        @relation("WorkItemOwner")
+  actedExecutiveWorkItemEvents WorkItemEvent[]   @relation("WorkItemEventActor")
+  decidedExecutiveRequests     DecisionRequest[] @relation("DecisionRequestDecider")
 }
 
 model Organization {
   id            String         @id @default(cuid())
   name          String
   slug          String         @unique
+  features      Json?
   createdAt     DateTime       @default(now())
   memberships   OrganizationMembership[]
   nodes         Node[]
@@ -109,6 +114,14 @@ model Organization {
   conversations Conversation[]
   documents     Document[]
   auditLogs     AuditLog[]
+  portfolioItems              PortfolioItem[]
+  executiveSignals            Signal[]
+  executiveWorkItems          WorkItem[]
+  executiveWorkItemEvents     WorkItemEvent[]
+  executiveBriefingRuns       BriefingRun[]
+  executiveDecisionRequests   DecisionRequest[]
+  executiveIntegrationCursors IntegrationCursor[]
+  executiveOutboxEvents       OutboxEvent[]
 }
 
 model Node {
@@ -132,22 +145,25 @@ model Node {
 }
 
 model Agent {
-  id             String         @id @default(cuid())
+  id             String          @id @default(cuid())
   organizationId String
   userId         String?
   name           String
   description    String?
-  systemPrompt   String         @db.Text
-  model          AgentModel     @default(GPT4O)
-  temperature    Float          @default(0.7)
-  maxTokens      Int            @default(2048)
-  isActive       Boolean        @default(true)
+  systemPrompt   String          @db.Text
+  model          AgentModel      @default(GPT4O)
+  temperature    Float           @default(0.7)
+  maxTokens      Int             @default(2048)
+  isActive       Boolean         @default(true)
   avatarUrl      String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   conversations  Conversation[]
+  portfolioItems PortfolioItem[]
+
+  @@unique([id, organizationId])
 }
 
 model Conversation {
@@ -215,4 +231,394 @@ model AuditLog {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   node           Node?        @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+}
+
+// ============================================================================
+// NEXOSAI EXECUTIVE (GERENTE GERAL PROATIVO) — F1A PILOT SCHEMA
+// ============================================================================
+
+enum PortfolioItemType {
+  APPLICATION
+  PRODUCT_IDEA
+  CLIENT_ACCOUNT
+  SALES_PIPELINE
+  OPERATIONAL_AREA
+  PERSONAL_DOMAIN
+}
+
+enum PortfolioLifecycle {
+  IDEA
+  DISCOVERY
+  ACTIVE_DEV
+  STAGING
+  PRODUCTION
+  MAINTENANCE
+  PAUSED
+  ARCHIVED
+}
+
+enum ExecutivePrivacyScope {
+  ORG_SHARED
+  EXECUTIVE_ONLY
+  PERSONAL_VAULT
+}
+
+enum SignalSourceType {
+  MANUAL
+  GITHUB
+  VERCEL
+  LINEAR
+  GOOGLE_CALENDAR
+  GMAIL
+  STRIPE
+  WEBHOOK
+  INTERNAL_AUDIT
+}
+
+enum SignalSeverity {
+  INFO
+  OPPORTUNITY
+  ATTENTION
+  WARNING
+  CRITICAL
+}
+
+enum SignalStatus {
+  NEW
+  LINKED_TO_WORK_ITEM
+  DISMISSED
+  EXPIRED
+}
+
+enum WorkItemCategory {
+  DEVELOPMENT
+  IDEA_INNOVATION
+  CLIENT_SUCCESS
+  SALES_REVENUE
+  OPERATIONS_INFRA
+  PERSONAL
+}
+
+enum WorkItemStatus {
+  BACKLOG
+  TRIAGE
+  TODAY
+  IN_PROGRESS
+  WAITING_EXTERNAL
+  WAITING_APPROVAL
+  SNOOZED
+  DONE
+  CANCELED
+}
+
+enum WorkItemPriorityBand {
+  P0_CRITICAL
+  P1_HIGH
+  P2_MEDIUM
+  P3_LOW
+}
+
+enum WorkItemEventType {
+  CREATED
+  STATUS_CHANGED
+  PRIORITY_RECALCULATED
+  SNOOZED
+  UNSNOOZED
+  SIGNAL_ATTACHED
+  DECISION_REQUESTED
+  DECISION_RESOLVED
+  COMMENT_ADDED
+  COMPLETED
+}
+
+enum BriefingCadenceType {
+  MORNING_BRIEFING
+  AFTERNOON_RADAR
+  EOD_CHECKIN
+  WEEKLY_REVIEW
+  CRITICAL_ALERT
+  AD_HOC
+}
+
+enum BriefingDeliveryStatus {
+  GENERATED
+  DELIVERED_IN_APP
+  ACKNOWLEDGED
+  SUPPRESSED_QUIET_HOURS
+  FAILED
+}
+
+enum DecisionRiskTier {
+  TIER_0_OBSERVE
+  TIER_1_SUGGEST
+  TIER_2_STAGE_DRAFT
+  TIER_3_EXECUTE_EXTERNAL
+}
+
+enum DecisionStatus {
+  PENDING
+  APPROVED
+  EDITED_AND_APPROVED
+  REJECTED
+  EXPIRED
+  EXECUTED
+  EXECUTION_FAILED
+}
+
+enum OutboxEventStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED_RETRYABLE
+  DEAD_LETTER
+}
+
+model PortfolioItem {
+  id                 String                @id @default(cuid())
+  organizationId     String
+  slug               String
+  name               String
+  description        String?               @db.Text
+  type               PortfolioItemType     @default(APPLICATION)
+  lifecycle          PortfolioLifecycle    @default(ACTIVE_DEV)
+  privacyScope       ExecutivePrivacyScope @default(ORG_SHARED)
+  isProactiveEnabled Boolean               @default(true)
+  ownerUserId        String?
+  linkedAgentId      String?
+  repoFullName       String?
+  productionUrl      String?
+  stagingUrl         String?
+  priorityWeight     Int                   @default(50)
+  staleAfterDays     Int                   @default(7)
+  lastActivityAt     DateTime?
+  metadata           Json?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  linkedAgent        Agent?                @relation(fields: [linkedAgentId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  signals            Signal[]
+  workItems          WorkItem[]
+  integrationCursors IntegrationCursor[]
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, slug])
+  @@index([organizationId, type, lifecycle])
+  @@index([organizationId, privacyScope])
+  @@index([organizationId, lastActivityAt])
+  @@map("exec_portfolio_items")
+}
+
+model Signal {
+  id               String                @id @default(cuid())
+  organizationId   String
+  portfolioItemId  String?
+  sourceType       SignalSourceType
+  externalId       String
+  dedupHash        String
+  severity         SignalSeverity        @default(INFO)
+  status           SignalStatus          @default(NEW)
+  privacyScope     ExecutivePrivacyScope @default(ORG_SHARED)
+  untrustedContent Boolean               @default(true)
+  title            String
+  summary          String?               @db.Text
+  sourceUrl        String?
+  rawMetadata      Json?
+  occurredAt       DateTime              @default(now())
+  ingestedAt       DateTime              @default(now())
+  expiresAt        DateTime?
+  linkedWorkItemId String?
+
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  portfolioItem    PortfolioItem?        @relation(fields: [portfolioItemId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  linkedWorkItem   WorkItem?             @relation("SignalToWorkItem", fields: [linkedWorkItemId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, sourceType, externalId])
+  @@index([organizationId, status, severity, occurredAt(sort: Desc)])
+  @@index([organizationId, portfolioItemId, occurredAt(sort: Desc)])
+  @@index([organizationId, dedupHash])
+  @@map("exec_signals")
+}
+
+model WorkItem {
+  id               String                @id @default(cuid())
+  organizationId   String
+  portfolioItemId  String?
+  createdByUserId  String?
+  ownerUserId      String?
+  category         WorkItemCategory      @default(DEVELOPMENT)
+  status           WorkItemStatus        @default(TRIAGE)
+  privacyScope     ExecutivePrivacyScope @default(ORG_SHARED)
+  title            String
+  description      String?               @db.Text
+  nextAction       String?               @db.Text
+  priorityScore    Float                 @default(50.0)
+  priorityBand     WorkItemPriorityBand  @default(P2_MEDIUM)
+  priorityReason   String?               @db.Text
+  dueAt            DateTime?
+  snoozedUntil     DateTime?
+  snoozeCount      Int                   @default(0)
+  staleAfterDays   Int                   @default(5)
+  lastTouchedAt    DateTime              @default(now())
+  completedAt      DateTime?
+  externalRef      String?
+  externalUrl      String?
+  metadata         Json?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  portfolioItem    PortfolioItem?        @relation(fields: [portfolioItemId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  createdByUser    User?                 @relation("WorkItemCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  ownerUser        User?                 @relation("WorkItemOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  signals          Signal[]              @relation("SignalToWorkItem")
+  events           WorkItemEvent[]
+  decisionRequests DecisionRequest[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, status, priorityScore(sort: Desc)])
+  @@index([organizationId, ownerUserId, status, priorityScore(sort: Desc)])
+  @@index([organizationId, portfolioItemId, status])
+  @@index([organizationId, privacyScope, status])
+  @@index([organizationId, snoozedUntil])
+  @@index([organizationId, dueAt])
+  @@map("exec_work_items")
+}
+
+model WorkItemEvent {
+  id             String            @id @default(cuid())
+  organizationId String
+  workItemId     String
+  actorUserId    String?
+  actorAgentId   String?
+  eventType      WorkItemEventType
+  fromStatus     WorkItemStatus?
+  toStatus       WorkItemStatus?
+  rationale      String?           @db.Text
+  payload        Json?
+  createdAt      DateTime          @default(now())
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workItem       WorkItem          @relation(fields: [workItemId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  actorUser      User?             @relation("WorkItemEventActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@unique([id, organizationId])
+  @@index([organizationId, workItemId, createdAt(sort: Desc)])
+  @@index([organizationId, eventType, createdAt(sort: Desc)])
+  @@map("exec_work_item_events")
+}
+
+model BriefingRun {
+  id                 String                 @id @default(cuid())
+  organizationId     String
+  recipientUserId    String?
+  cadenceType        BriefingCadenceType
+  deliveryStatus     BriefingDeliveryStatus @default(GENERATED)
+  timezone           String                 @default("America/Fortaleza")
+  windowStart        DateTime
+  windowEnd          DateTime
+  headline           String
+  summaryMarkdown    String                 @db.Text
+  topWorkItemIds     Json
+  stalePortfolioIds  Json?
+  pendingDecisionIds Json?
+  metricsSnapshot    Json?
+  generatedAt        DateTime               @default(now())
+  acknowledgedAt     DateTime?
+
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, cadenceType, windowStart, windowEnd])
+  @@index([organizationId, recipientUserId, generatedAt(sort: Desc)])
+  @@map("exec_briefing_runs")
+}
+
+model DecisionRequest {
+  id                 String                @id @default(cuid())
+  organizationId     String
+  workItemId         String
+  requestedByAgent   String                @default("nexosai-executive-gm")
+  decidedByUserId    String?
+  riskTier           DecisionRiskTier      @default(TIER_2_STAGE_DRAFT)
+  status             DecisionStatus        @default(PENDING)
+  privacyScope       ExecutivePrivacyScope @default(ORG_SHARED)
+  actionType         String
+  title              String
+  rationale          String                @db.Text
+  proposedPayload    Json
+  payloadHash        String
+  editedPayload      Json?
+  editedPayloadHash  String?
+  payloadDiffSummary Json?
+  decisionNote       String?               @db.Text
+  executionResult    Json?
+  expiresAt          DateTime?
+  decidedAt          DateTime?
+  executedAt         DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workItem           WorkItem              @relation(fields: [workItemId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  decidedByUser      User?                 @relation("DecisionRequestDecider", fields: [decidedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([id, organizationId])
+  @@index([organizationId, status, riskTier, createdAt(sort: Desc)])
+  @@index([organizationId, workItemId])
+  @@map("exec_decision_requests")
+}
+
+model IntegrationCursor {
+  id                String           @id @default(cuid())
+  organizationId    String
+  portfolioItemId   String?
+  sourceType        SignalSourceType
+  externalScopeKey  String
+  cursorValue       String?          @db.Text
+  etag              String?
+  isEnabled         Boolean          @default(true)
+  scopesGranted     String?
+  lastSyncAt        DateTime?
+  lastSuccessAt     DateTime?
+  lastErrorCode     String?
+  lastErrorMessage  String?          @db.Text
+  consecutiveErrors Int              @default(0)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  portfolioItem     PortfolioItem?   @relation(fields: [portfolioItemId, organizationId], references: [id, organizationId], onDelete: Restrict)
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, sourceType, externalScopeKey])
+  @@index([organizationId, isEnabled, lastSyncAt])
+  @@map("exec_integration_cursors")
+}
+
+model OutboxEvent {
+  id             String            @id @default(cuid())
+  organizationId String
+  aggregateType  String
+  aggregateId    String
+  eventType      String
+  idempotencyKey String
+  payload        Json
+  status         OutboxEventStatus @default(PENDING)
+  attemptCount   Int               @default(0)
+  maxAttempts    Int               @default(5)
+  nextRetryAt    DateTime          @default(now())
+  lastError      String?           @db.Text
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, idempotencyKey])
+  @@index([status, nextRetryAt])
+  @@index([organizationId, aggregateType, aggregateId])
+  @@map("exec_outbox_events")
 }

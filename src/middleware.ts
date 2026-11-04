@@ -3,7 +3,11 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const isProtected = pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.startsWith('/audit');
+  const isProtected =
+    pathname.startsWith('/admin') ||
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/audit') ||
+    pathname.startsWith('/executive');
 
   if (isProtected) {
     const sessionToken =
@@ -21,5 +25,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/admin/:path*', '/audit/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*', '/audit/:path*', '/executive/:path*'],
 };
