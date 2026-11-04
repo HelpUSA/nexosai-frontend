@@ -5,7 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 // This smoke test verifies the real App Router authentication endpoint never
 // defaults to an open login when credentials are absent. No external hosts.
 if (process.env.G3C_EPHEMERAL_POSTGRES !== 'YES' ||
-    !/^postgresql:\/\/[^@]+@127\.0\.0\.1:5432\/nexosai_g3c_test$/.test(process.env.DATABASE_URL || '')) {
+    !/^postgresql:\/\/[^@]+@(?:127\.0\.0\.1|localhost)(?::\d+)?\/nexosai_g3c_test$/.test(process.env.DATABASE_URL || '')) {
   throw new Error('Refusing to run unless disposable local PostgreSQL is configured');
 }
 

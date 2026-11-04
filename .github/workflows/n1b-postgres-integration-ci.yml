@@ -8,6 +8,7 @@ on:
       - 'test/g3c-unified-hardening-candidate-20261103'
       - 'test/g3c-unified-integrity-candidate-20261103'
       - 'test/g3c-strict-release-candidate-20261103'
+      - 'feat/nexosai-executive-f1a-pilot-20261104'
   pull_request:
     branches:
       - 'audit/n1b-dev-advisories-20261101'
@@ -57,9 +58,9 @@ jobs:
       - name: Baseline ephemeral push
         run: npx prisma db push --skip-generate
       - name: Admin & tenant authorization unit regression
-        run: node --test test/n1b-admin-guard.test.mjs test/n1b-scoped-resources.test.mjs test/n1b-provisioning-policy.test.mjs test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1a-oidc-http-integration.test.mjs test/n1b-order040-independent-acceptance.test.mjs
+        run: node --test test/n1b-admin-guard.test.mjs test/n1b-scoped-resources.test.mjs test/n1b-provisioning-policy.test.mjs test/n1b-prisma-session-guard.test.mjs test/n1b-http-tenant-guards.test.mjs test/n1a-oidc-http-integration.test.mjs test/n1b-order040-independent-acceptance.test.mjs test/executive-f1a-unit.test.mjs
       - name: Postgres authorization integration
-        run: node --test test/n1b-postgres-membership.integration.test.mjs
+        run: node --test test/n1b-postgres-membership.integration.test.mjs test/executive-f1a-postgres-rls.integration.test.mjs
       - run: npm run build
       - name: Actual Next.js unauthenticated route smoke (no real identity)
         run: node test/n1b-next-http-unauth.smoke.mjs

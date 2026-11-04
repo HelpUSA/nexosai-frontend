@@ -4,6 +4,7 @@ on:
     branches:
       - audit/g3c-typescript-build-gate-20261103
       - 'test/g3c-strict-release-candidate-20261103'
+      - 'feat/nexosai-executive-f1a-pilot-20261104'
   workflow_dispatch:
 permissions:
   contents: read

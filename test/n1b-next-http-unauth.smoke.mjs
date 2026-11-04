@@ -4,7 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 // Only runs against Next.js server on localhost, with synthetic environment and ephemeral DB.
 if (process.env.G3C_EPHEMERAL_POSTGRES !== 'YES' ||
-    !(process.env.DATABASE_URL || '').includes('@127.0.0.1:5432/nexosai_g3c_test')) {
+    !/^postgresql:\/\/[^@]+@(?:127\.0\.0\.1|localhost)(?::\d+)?\/nexosai_g3c_test$/.test(process.env.DATABASE_URL || '')) {
   throw new Error('Real route smoke test requires ephemeral local Postgres only');
 }
 const port=3101;
@@ -27,7 +27,10 @@ try {
   '/api/orgs/org-a/nodes/node-a',
   '/api/orgs/org-a/agents/agent-a',
   '/api/orgs/org-a/conversations/conv-a',
-  '/api/orgs/org-a/conversations/conv-a/messages/msg-a'
+  '/api/orgs/org-a/conversations/conv-a/messages/msg-a',
+  '/api/orgs/org-a/executive/work-items',
+  '/api/orgs/org-a/executive/briefing',
+  '/api/orgs/org-a/executive/signals/ingest'
  ]){
   const result=await fetch(origin+route,{redirect:'manual',signal:AbortSignal.timeout(5000)});
   assert.equal(result.status,401,`Expected unsigned request to ${route} to be rejected`);
