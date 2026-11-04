@@ -1,6 +1,6 @@
-// F1A Executive Gate: Quadruple Feature Flag (Fail-Closed OFF by default),
-// Tenant RBAC (N1-B), Personal Vault / Non-F1A Connector Prohibition,
-// and Transactional Tenant GUC (SET LOCAL) for PostgreSQL FORCE RLS.
+// F1A Executive Gate: Fail-Closed Quadruple Feature Flag,
+// Strict Tenant RBAC (N1-B), Personal Vault & Non-F1A Connector Blockade,
+// and Fail-Closed Parameterized Transactional RLS Context.
 
 const EMAIL = /^[a-z0-9.!#$%&'*+/=?^_{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 const ID = /^[A-Za-z0-9_-]{1,100}$/;
@@ -54,22 +54,39 @@ export function assertF1AScopeAllowed({
   return Object.freeze({ ok: true, status: 200, code: 'F1A_SCOPE_ALLOWED' });
 }
 
+/**
+ * Strict fail-closed RLS context runner.
+ * NO fallback allowed: if $transaction or parameterized query execution is missing,
+ * or if setting the local role / GUC fails, throws immediately and NEVER executes callback.
+ */
 export async function withExecutiveTenantContext(db, organizationId, callback) {
   if (typeof organizationId !== 'string' || !ID.test(organizationId)) {
     throw new Error('INVALID_TENANT_CONTEXT_ID');
   }
-  if (typeof db?.$transaction === 'function') {
-    return db.$transaction(async (tx) => {
-      if (typeof tx?.$executeRawUnsafe === 'function') {
-        await tx.$executeRawUnsafe('SET LOCAL ROLE nexosai_rls_tenant_enforced');
-      }
-      if (typeof tx?.$executeRaw === 'function') {
-        await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${organizationId}, true)`;
-      }
-      return callback(tx);
-    });
+  if (typeof db?.$transaction !== 'function') {
+    throw new Error('DATABASE_TRANSACTION_INTERFACE_UNAVAILABLE');
   }
-  return callback(db);
+
+  return db.$transaction(async (tx) => {
+    if (typeof tx?.$executeRaw !== 'function') {
+      throw new Error('TRANSACTION_EXECUTE_INTERFACE_UNAVAILABLE');
+    }
+
+    // Set local unprivileged RLS enforcement role strictly
+    if (typeof tx?.$executeRawUnsafe === 'function') {
+      await tx.$executeRawUnsafe('SET LOCAL ROLE nexosai_rls_tenant_enforced');
+    } else {
+      throw new Error('TRANSACTION_RAW_EXECUTE_UNAVAILABLE');
+    }
+
+    // Parameterized setting of tenant GUC
+    const gucSetCount = await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${organizationId}, true)`;
+    if (gucSetCount === undefined || gucSetCount === null) {
+      throw new Error('FAILED_TO_SET_TENANT_RLS_GUC');
+    }
+
+    return callback(tx);
+  });
 }
 
 export async function authorizeExecutiveAccess({
@@ -94,7 +111,7 @@ export async function authorizeExecutiveAccess({
     return fail(404, 'NOT_FOUND');
   }
 
-  // Gate 1: Global kill-switch / feature flag (OFF by default)
+  // Gate 1: Global feature flag (Fail-closed OFF by default)
   if (!isExecutiveGlobalEnabled(env)) {
     return fail(403, 'EXECUTIVE_MODULE_DISABLED');
   }
@@ -127,7 +144,7 @@ export async function authorizeExecutiveAccess({
       return fail(403, 'ORG_MEMBERSHIP_REQUIRED');
     }
 
-    // Gate 4: Explicit role check (OWNER or ADMIN for executive operations)
+    // Gate 4: Tenant RBAC role check (OWNER or ADMIN)
     if (!requiredRoles.includes(membership.role)) {
       return fail(403, 'ROLE_FORBIDDEN');
     }
@@ -148,7 +165,7 @@ export async function authorizeExecutiveAccess({
       return fail(403, 'EXECUTIVE_ORG_FEATURE_DISABLED');
     }
 
-    // Gate 3: Optional PortfolioItem-level proactive check
+    // Gate 3: Optional PortfolioItem-level proactive toggle & privacy validation
     let portfolioItem = null;
     if (portfolioItemId) {
       portfolioItem = await withExecutiveTenantContext(db, organizationId, async (tx) => {
@@ -167,6 +184,7 @@ export async function authorizeExecutiveAccess({
             priorityWeight: true,
             staleAfterDays: true,
             lastActivityAt: true,
+            repoFullName: true,
           },
         });
       });
@@ -192,7 +210,10 @@ export async function authorizeExecutiveAccess({
       organization,
       portfolioItem,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message?.includes('DATABASE_TRANSACTION_INTERFACE_UNAVAILABLE')) {
+      return fail(503, 'AUTHZ_STORAGE_UNAVAILABLE');
+    }
     return fail(503, 'AUTHZ_STORAGE_UNAVAILABLE');
   }
 }

@@ -1,7 +1,12 @@
 // F1A Executive Security: Untrusted external content sanitization,
-// indirect prompt injection detection, secret redaction, and deduplication hash.
+// structured validation of URLs/metadata/identifiers, indirect prompt injection detection,
+// secret redaction, and unforgeable connector provenance symbol.
 
 import { createHash } from 'node:crypto';
+
+export const INTERNAL_CONNECTOR_PROVENANCE_TOKEN = Symbol.for(
+  'nexosai.executive.f1a.internal_connector_provenance'
+);
 
 const SECRET_PATTERNS = [
   /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{16,255}\b/g,
@@ -23,6 +28,11 @@ const PROMPT_INJECTION_PATTERNS = [
   /bypass\s+(?:human|hitl|approval|rls|tenant)/i,
 ];
 
+const STRICT_EXTERNAL_ID_RX = /^[A-Za-z0-9_.:/#-]{1,160}$/;
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const SENSITIVE_URL_PARAM_RX =
+  /(?:^|[?&])(?:access_token|token|auth|key|secret|password|sig|signature|code|client_secret)=/i;
+
 export function redactSecrets(input) {
   if (typeof input !== 'string' || input.length === 0) return '';
   let out = input;
@@ -32,6 +42,135 @@ export function redactSecrets(input) {
   return out;
 }
 
+export function validateStrictIdentifier(value, { minLen = 1, maxLen = 160 } = {}) {
+  if (typeof value !== 'string') {
+    return Object.freeze({ ok: false, status: 400, code: 'INVALID_IDENTIFIER_TYPE' });
+  }
+  const trimmed = value.trim();
+  if (
+    trimmed.length < minLen ||
+    trimmed.length > maxLen ||
+    !STRICT_EXTERNAL_ID_RX.test(trimmed) ||
+    trimmed.includes('..') ||
+    trimmed.includes('\\')
+  ) {
+    return Object.freeze({ ok: false, status: 400, code: 'INVALID_IDENTIFIER_FORMAT' });
+  }
+  return Object.freeze({ ok: true, status: 200, value: trimmed });
+}
+
+export function validateSafeSourceUrl(rawUrl, { requiredOriginPrefix = null } = {}) {
+  if (rawUrl === null || rawUrl === undefined || rawUrl === '') {
+    return Object.freeze({ ok: true, status: 200, url: null });
+  }
+  if (typeof rawUrl !== 'string' || rawUrl.length > 512) {
+    return Object.freeze({ ok: false, status: 400, code: 'INVALID_SOURCE_URL_LENGTH' });
+  }
+  let parsed;
+  try {
+    parsed = new URL(rawUrl.trim());
+  } catch {
+    return Object.freeze({ ok: false, status: 400, code: 'INVALID_SOURCE_URL_FORMAT' });
+  }
+  if (parsed.protocol !== 'https:') {
+    return Object.freeze({ ok: false, status: 400, code: 'SOURCE_URL_HTTPS_REQUIRED' });
+  }
+  if (parsed.username || parsed.password) {
+    return Object.freeze({ ok: false, status: 400, code: 'SOURCE_URL_CREDENTIALS_FORBIDDEN' });
+  }
+  if (SENSITIVE_URL_PARAM_RX.test(parsed.search)) {
+    return Object.freeze({
+      ok: false,
+      status: 400,
+      code: 'SOURCE_URL_SENSITIVE_QUERY_OR_HASH_FORBIDDEN',
+    });
+  }
+  // Strip any query string or fragment to prevent token reflection in URLs
+  const cleanUrl = `${parsed.origin}${parsed.pathname}`;
+  if (SECRET_PATTERNS.some((rx) => rx.test(cleanUrl))) {
+    return Object.freeze({ ok: false, status: 400, code: 'SOURCE_URL_SECRET_DETECTED' });
+  }
+  if (requiredOriginPrefix && !cleanUrl.startsWith(requiredOriginPrefix)) {
+    return Object.freeze({
+      ok: false,
+      status: 403,
+      code: 'SOURCE_URL_OUTSIDE_AUTHORIZED_SCOPE',
+    });
+  }
+  return Object.freeze({ ok: true, status: 200, url: cleanUrl });
+}
+
+export function validateAndSanitizeMetadata(
+  rawMetadata,
+  { maxDepth = 2, maxKeys = 15, maxStringLen = 256, maxSerializedBytes = 4096 } = {}
+) {
+  if (rawMetadata === null || rawMetadata === undefined) {
+    return Object.freeze({ ok: true, status: 200, metadata: {} });
+  }
+  if (typeof rawMetadata !== 'object' || Array.isArray(rawMetadata)) {
+    return Object.freeze({ ok: false, status: 400, code: 'INVALID_METADATA_ROOT_TYPE' });
+  }
+
+  let totalKeys = 0;
+
+  function sanitizeNode(node, depth) {
+    if (depth > maxDepth) {
+      throw new Error('METADATA_MAX_DEPTH_EXCEEDED');
+    }
+    if (node === null || node === undefined) return null;
+    if (typeof node === 'boolean') return node;
+    if (typeof node === 'number') {
+      if (!Number.isFinite(node)) throw new Error('METADATA_NON_FINITE_NUMBER');
+      return node;
+    }
+    if (typeof node === 'string') {
+      const cleaned = redactSecrets(
+        node.replace(/[\u0000-\u001F\u007F]/g, ' ').trim()
+      );
+      return cleaned.length > maxStringLen ? cleaned.slice(0, maxStringLen) : cleaned;
+    }
+    if (Array.isArray(node)) {
+      if (node.length > maxKeys) throw new Error('METADATA_ARRAY_TOO_LARGE');
+      return node.map((item) => sanitizeNode(item, depth + 1));
+    }
+    if (typeof node === 'object') {
+      const proto = Object.getPrototypeOf(node);
+      if (proto !== Object.prototype && proto !== null) {
+        throw new Error('METADATA_PROTOTYPE_INVALID');
+      }
+      const keys = Object.keys(node);
+      totalKeys += keys.length;
+      if (totalKeys > maxKeys) {
+        throw new Error('METADATA_MAX_KEYS_EXCEEDED');
+      }
+      const out = {};
+      for (const k of keys) {
+        if (DANGEROUS_KEYS.has(k) || k.length > 64 || !/^[A-Za-z0-9_.-]+$/.test(k)) {
+          throw new Error('METADATA_INVALID_KEY');
+        }
+        out[k] = sanitizeNode(node[k], depth + 1);
+      }
+      return out;
+    }
+    throw new Error('METADATA_UNSUPPORTED_VALUE_TYPE');
+  }
+
+  try {
+    const sanitized = sanitizeNode(rawMetadata, 0);
+    const serialized = JSON.stringify(sanitized);
+    if (Buffer.byteLength(serialized, 'utf8') > maxSerializedBytes) {
+      return Object.freeze({ ok: false, status: 400, code: 'METADATA_SIZE_LIMIT_EXCEEDED' });
+    }
+    return Object.freeze({ ok: true, status: 200, metadata: sanitized });
+  } catch (err) {
+    return Object.freeze({
+      ok: false,
+      status: 400,
+      code: err instanceof Error ? err.message : 'INVALID_METADATA_STRUCTURE',
+    });
+  }
+}
+
 export function sanitizeExternalContent(
   rawText,
   { maxChars = 2000, wrapDelimiter = true } = {}
@@ -39,7 +178,6 @@ export function sanitizeExternalContent(
   const raw = typeof rawText === 'string' ? rawText : String(rawText ?? '');
   const injectionAttemptDetected = PROMPT_INJECTION_PATTERNS.some((rx) => rx.test(raw));
 
-  // Strip script/style blocks, HTML tags, and non-printable control chars
   const withoutScripts = raw
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')

@@ -76,6 +76,18 @@ export async function POST(
     const { organizationId } = await context.params;
     const body = await request.json().catch(() => ({}));
 
+    // Strict Anti-Spoofing: External manual API callers CANNOT claim GITHUB, VERCEL, or other automated source types!
+    const requestedSource = String(body?.sourceType || 'MANUAL').trim().toUpperCase();
+    if (requestedSource !== 'MANUAL') {
+      return NextResponse.json(
+        {
+          error: 'CONNECTOR_SOURCE_SPOOFING_FORBIDDEN',
+          message: 'External callers can only submit MANUAL signals; automated connector origins cannot be forged',
+        },
+        { status: 403, headers: { 'cache-control': 'no-store' } }
+      );
+    }
+
     const access = await authorizeExecutiveAccess({
       email: session.user.email,
       organizationId,
@@ -94,7 +106,7 @@ export async function POST(
       return ingestExecutiveSignal(tx, {
         organizationId,
         portfolioItemId: body?.portfolioItemId || null,
-        sourceType: body?.sourceType || 'MANUAL',
+        sourceType: 'MANUAL',
         externalId: body?.externalId,
         severity: body?.severity || 'INFO',
         privacyScope: body?.privacyScope || 'ORG_SHARED',
@@ -103,12 +115,13 @@ export async function POST(
         sourceUrl: body?.sourceUrl || null,
         rawMetadata: body?.rawMetadata || null,
         occurredAt: body?.occurredAt || null,
+        actorUserId: access.userId,
       });
     });
 
     if (!ingested.ok) {
       return NextResponse.json(
-        { error: ingested.code },
+        { error: ingested.code, message: ingested.message },
         { status: ingested.status, headers: { 'cache-control': 'no-store' } }
       );
     }

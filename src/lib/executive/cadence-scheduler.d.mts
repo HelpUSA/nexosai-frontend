@@ -35,6 +35,7 @@ export interface CadenceSlotEvaluation {
   readonly dayOfWeek: number;
   readonly isQuietHours: boolean;
   readonly matchedCadence: string | null;
+  readonly slotKey: string;
   readonly windowStart: Date;
   readonly windowEnd: Date;
   readonly config: CadenceConfig;
@@ -78,6 +79,11 @@ export function resolveTenantCadenceConfig(overrides?: Record<string, unknown>):
 export function getLocalTimeParts(date?: Date | string, timeZone?: string): LocalTimeParts;
 export function isWithinQuietHours(date?: Date | string, config?: Record<string, unknown>): boolean;
 export function evaluateCadenceSlot(date?: Date | string, config?: Record<string, unknown>): CadenceSlotEvaluation;
+
+export function executeAutoUnsnoozeMutation(
+  tx: unknown,
+  input: { organizationId: string; now?: Date | string }
+): Promise<{ readonly ok: boolean; readonly count: number }>;
 
 export function buildMeuDiaAndRadarSnapshot(
   tx: unknown,

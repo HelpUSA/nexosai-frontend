@@ -1,7 +1,7 @@
-// F1A Cadence Scheduler & "Meu Dia + Radar" Builder
-// Implements Master SuperAdmin D3 Approved Defaults:
-// Timezone: America/Fortaleza | Briefing: 08:00 | Radar: 13:00 | Weekly: Mon 08:30 | Quiet: 22:00-07:00
-// Background jobs are DISABLED by default in F1A (no active cron, no external notifications).
+// F1A Cadence Scheduler & "Meu Dia + Radar" Snapshot Engine
+// Pure read-only snapshot generation (NO mutation on GET).
+// Dedicated transactional unsnooze mutator for background worker / POST jobs.
+// Implements Master SuperAdmin D3 Approved Defaults in America/Fortaleza.
 
 import { isExecutiveGlobalEnabled } from './executive-gate.mjs';
 
@@ -44,7 +44,7 @@ export function resolveTenantCadenceConfig(overrides = {}) {
     ...APPROVED_D3_CADENCE_DEFAULTS,
     ...(overrides && typeof overrides === 'object' ? overrides : {}),
   };
-  // Validate IANA timezone early (throws RangeError if invalid)
+  // Validate IANA timezone early
   new Intl.DateTimeFormat('en-US', { timeZone: merged.timezone });
   return Object.freeze(merged);
 }
@@ -94,13 +94,16 @@ export function isWithinQuietHours(date = new Date(), config = {}) {
   const endMin = parseHhMmToMinutes(cfg.quietHoursEnd);
   const curMin = local.minutesOfDay;
 
-  // Overnight window (e.g., 22:00 -> 07:00)
   if (startMin > endMin) {
     return curMin >= startMin || curMin < endMin;
   }
   return curMin >= startMin && curMin < endMin;
 }
 
+/**
+ * Evaluates cadence slot using true UTC instant boundaries.
+ * Does NOT construct bogus timestamps with Date.UTC from local civil wall-clock parts.
+ */
 export function evaluateCadenceSlot(date = new Date(), config = {}) {
   const cfg = resolveTenantCadenceConfig(config);
   const refDate = date instanceof Date ? date : new Date(date);
@@ -125,11 +128,16 @@ export function evaluateCadenceSlot(date = new Date(), config = {}) {
     matchedCadence = 'AFTERNOON_RADAR';
   }
 
-  // Deterministic 30-minute window boundaries for idempotency
-  const slotWindowStart = new Date(
-    Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute >= 30 ? 30 : 0, 0, 0)
-  );
-  const slotWindowEnd = new Date(slotWindowStart.getTime() + 30 * 60 * 1000);
+  // True UTC 30-minute block boundaries based on actual unix epoch
+  const slotDurationMs = 30 * 60 * 1000;
+  const trueEpochMs = refDate.getTime();
+  const windowStartEpoch = Math.floor(trueEpochMs / slotDurationMs) * slotDurationMs;
+  const slotWindowStart = new Date(windowStartEpoch);
+  const slotWindowEnd = new Date(windowStartEpoch + slotDurationMs);
+
+  // Discrete slot identifier combining IANA timezone, local civil date, cadence, and 30m slot index
+  const slotIndex = Math.floor(curMin / 30);
+  const slotKey = `${cfg.timezone}#${local.dateKey}#${matchedCadence || 'AD_HOC'}#slot_${slotIndex}`;
 
   return Object.freeze({
     timezone: cfg.timezone,
@@ -138,34 +146,83 @@ export function evaluateCadenceSlot(date = new Date(), config = {}) {
     dayOfWeek: local.dayOfWeek,
     isQuietHours: quiet,
     matchedCadence,
+    slotKey,
     windowStart: slotWindowStart,
     windowEnd: slotWindowEnd,
     config: cfg,
   });
 }
 
-export async function buildMeuDiaAndRadarSnapshot(
-  tx,
-  { organizationId, now = new Date(), tenantCadenceConfig = {} }
-) {
+/**
+ * Dedicated transactional mutation to auto-unsnooze expired items.
+ * Emits audit events and outbox events for every unsnoozed item.
+ * Must ONLY be called by background jobs or dedicated POST endpoints, NEVER inside GET!
+ */
+export async function executeAutoUnsnoozeMutation(tx, { organizationId, now = new Date() }) {
   const refNow = now instanceof Date ? now : new Date(now);
-  const cadenceEval = evaluateCadenceSlot(refNow, tenantCadenceConfig);
+  if (typeof tx?.workItem?.findMany !== 'function' || typeof tx?.workItem?.update !== 'function') {
+    return Object.freeze({ ok: true, count: 0 });
+  }
 
-  // Auto-unsnooze expired snoozed items inside the tenant transaction
-  if (typeof tx?.workItem?.updateMany === 'function') {
-    await tx.workItem.updateMany({
-      where: {
-        organizationId,
-        status: 'SNOOZED',
-        snoozedUntil: { lte: refNow },
-      },
+  const expiredSnoozes = await tx.workItem.findMany({
+    where: {
+      organizationId,
+      status: 'SNOOZED',
+      snoozedUntil: { lte: refNow },
+    },
+    select: { id: true, title: true, priorityScore: true },
+  });
+
+  for (const item of expiredSnoozes) {
+    await tx.workItem.update({
+      where: { id: item.id },
       data: {
         status: 'TODAY',
         snoozedUntil: null,
         lastTouchedAt: refNow,
       },
     });
+
+    if (typeof tx?.workItemEvent?.create === 'function') {
+      await tx.workItemEvent.create({
+        data: {
+          organizationId,
+          workItemId: item.id,
+          eventType: 'UNSNOOZED',
+          fromStatus: 'SNOOZED',
+          toStatus: 'TODAY',
+          rationale: 'Prazo de snooze expirado; retornado automaticamente para TODAY',
+        },
+      });
+    }
+
+    if (typeof tx?.outboxEvent?.create === 'function') {
+      await tx.outboxEvent.create({
+        data: {
+          organizationId,
+          aggregateType: 'WorkItem',
+          aggregateId: item.id,
+          eventType: 'WORK_ITEM_UNSNOOZED',
+          idempotencyKey: `auto-unsnooze:${organizationId}:${item.id}:${refNow.toISOString().slice(0, 13)}`,
+          payload: { workItemId: item.id, organizationId, status: 'TODAY' },
+        },
+      });
+    }
   }
+
+  return Object.freeze({ ok: true, count: expiredSnoozes.length });
+}
+
+/**
+ * Pure read-only snapshot generation.
+ * STRICTLY READ-ONLY: zero inserts, zero updates, zero side-effects. Safe for HTTP GET.
+ */
+export async function buildMeuDiaAndRadarSnapshot(
+  tx,
+  { organizationId, now = new Date(), tenantCadenceConfig = {} }
+) {
+  const refNow = now instanceof Date ? now : new Date(now);
+  const cadenceEval = evaluateCadenceSlot(refNow, tenantCadenceConfig);
 
   const rawPortfolioItems =
     typeof tx?.portfolioItem?.findMany === 'function'
@@ -178,13 +235,17 @@ export async function buildMeuDiaAndRadarSnapshot(
         })
       : [];
 
+  // Query open items (considers items whose snooze expired as effectively active for display without mutating DB)
   const openWorkItems =
     typeof tx?.workItem?.findMany === 'function'
       ? await tx.workItem.findMany({
           where: {
             organizationId,
             privacyScope: { in: ['ORG_SHARED', 'EXECUTIVE_ONLY'] },
-            status: { notIn: ['DONE', 'CANCELED', 'SNOOZED'] },
+            OR: [
+              { status: { notIn: ['DONE', 'CANCELED', 'SNOOZED'] } },
+              { status: 'SNOOZED', snoozedUntil: { lte: refNow } },
+            ],
           },
           orderBy: [{ priorityScore: 'desc' }, { updatedAt: 'desc' }],
           take: 50,
@@ -209,7 +270,7 @@ export async function buildMeuDiaAndRadarSnapshot(
         })
       : [];
 
-  // Identify stale / forgotten portfolio items (Radar de Projetos Sem Movimento)
+  // Radar de Projetos Sem Movimento
   const stalePortfolioRadar = rawPortfolioItems
     .filter((item) => item.isProactiveEnabled !== false && item.lifecycle !== 'ARCHIVED')
     .map((item) => {
@@ -292,7 +353,7 @@ export async function runScheduledBriefingJob(
   const slotEval = evaluateCadenceSlot(refNow, cfg);
   const effectiveCadence = cadenceType || slotEval.matchedCadence || 'AD_HOC';
 
-  // Check idempotency first
+  // Check idempotency first using discrete window boundaries
   if (typeof tx?.briefingRun?.findFirst === 'function') {
     const existing = await tx.briefingRun.findFirst({
       where: {
@@ -313,7 +374,7 @@ export async function runScheduledBriefingJob(
     }
   }
 
-  // Quiet hours enforcement (22:00-07:00 America/Fortaleza)
+  // Quiet hours enforcement
   if (slotEval.isQuietHours) {
     const suppressedRun = await tx.briefingRun.create({
       data: {
@@ -328,7 +389,7 @@ export async function runScheduledBriefingJob(
         topWorkItemIds: [],
         stalePortfolioIds: [],
         pendingDecisionIds: [],
-        metricsSnapshot: { suppressedByQuietHours: true, localHhMm: slotEval.localHhMm },
+        metricsSnapshot: { suppressedByQuietHours: true, slotKey: slotEval.slotKey },
         generatedAt: refNow,
       },
     });
@@ -341,7 +402,10 @@ export async function runScheduledBriefingJob(
     });
   }
 
-  // Daily critical alert cap (max 3/day) and 12h cooldown check
+  // Auto-unsnooze during active background job
+  await executeAutoUnsnoozeMutation(tx, { organizationId, now: refNow });
+
+  // Critical alerts daily cap
   if (effectiveCadence === 'CRITICAL_ALERT' && typeof tx?.briefingRun?.count === 'function') {
     const startOfDay = new Date(refNow.getTime() - 24 * 60 * 60 * 1000);
     const recentAlerts = await tx.briefingRun.count({
@@ -370,6 +434,7 @@ export async function runScheduledBriefingJob(
   const summaryLines = [
     `# ${headline}`,
     `- **Fuso Horário:** \`${cfg.timezone}\` (${slotEval.localDateKey} ${slotEval.localHhMm})`,
+    `- **Slot Key:** \`${slotEval.slotKey}\``,
     `- **Top Prioridades:** ${snapshot.topPriorities.map((w) => `${w.title} (${w.priorityBand}: ${w.priorityScore})`).join('; ') || 'Nenhuma pendência crítica'}`,
     `- **Radar Sem Movimento:** ${snapshot.stalePortfolioRadar.map((p) => `${p.name} (${p.daysIdle}d sem atividade)`).join('; ') || 'Portfólio em dia'}`,
   ];

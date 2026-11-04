@@ -6,6 +6,7 @@ export interface SignalIngestionResult {
   readonly code: string;
   readonly deduplicated?: boolean;
   readonly signal?: Record<string, unknown>;
+  readonly message?: string;
 }
 
 export interface ConnectorSyncResult {
@@ -38,6 +39,8 @@ export function ingestExecutiveSignal(
     sourceUrl?: string | null;
     rawMetadata?: Record<string, unknown> | null;
     occurredAt?: Date | string | null;
+    actorUserId?: string | null;
+    provenanceToken?: symbol | null;
     now?: Date | string;
   }
 ): Promise<SignalIngestionResult>;

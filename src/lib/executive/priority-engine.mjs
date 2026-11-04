@@ -1,4 +1,6 @@
 // F1A Deterministic & Explainable Priority Engine + WorkItem State Machine
+// Prohibits transition to DONE without explicit verification evidence.
+// Prohibits external outbox event publishing in F1A (strictly internal/audit events).
 
 import { assertF1AScopeAllowed, EXECUTIVE_QUOTAS } from './executive-gate.mjs';
 import { redactSecrets } from './executive-security.mjs';
@@ -46,7 +48,6 @@ export function computeWorkItemPriority(input = {}, now = new Date()) {
   const refNow = now instanceof Date ? now : new Date(now);
   const nowMs = refNow.getTime();
 
-  // 1. Urgency (U: 0..100, weight 0.35)
   let urgency = 45;
   let urgencyLabel = 'Sem prazo crítico';
   if (input.dueAt) {
@@ -72,7 +73,6 @@ export function computeWorkItemPriority(input = {}, now = new Date()) {
     }
   }
 
-  // 2. Business/Portfolio Impact (I: 0..100, weight 0.30)
   const basePortfolioWeight =
     typeof input.portfolioPriorityWeight === 'number'
       ? clamp(input.portfolioPriorityWeight, 0, 100)
@@ -80,7 +80,6 @@ export function computeWorkItemPriority(input = {}, now = new Date()) {
   const categoryBonus = CATEGORY_IMPACT_BONUS[input.category] ?? 10;
   const impact = clamp(basePortfolioWeight + categoryBonus, 0, 100);
 
-  // 3. Staleness / Inactivity (S: 0..100, weight 0.20)
   const staleAfterDays = Math.max(1, Number(input.staleAfterDays) || 5);
   let daysSinceTouch = 0;
   if (input.lastTouchedAt) {
@@ -92,12 +91,10 @@ export function computeWorkItemPriority(input = {}, now = new Date()) {
   const stalenessRatio = daysSinceTouch / staleAfterDays;
   const staleness = clamp(Math.round(stalenessRatio * 70), 0, 100);
 
-  // 4. Blocker / Signal Severity (B: 0..100, weight 0.15)
   const severityKey = String(input.highestSignalSeverity || 'INFO').toUpperCase();
   const baseSeverity = SEVERITY_BLOCKER_SCORE[severityKey] ?? 20;
   const blocker = clamp(input.isBlocking ? Math.max(baseSeverity, 90) : baseSeverity, 0, 100);
 
-  // 5. Snooze / Anti-Fatigue Penalty (F: 0..100, weight -0.10)
   const snoozeCount = Math.max(0, Number(input.snoozeCount) || 0);
   let activeSnoozePenalty = 0;
   if (input.snoozedUntil) {
@@ -149,6 +146,8 @@ export function validateWorkItemTransition({
   fromStatus,
   toStatus,
   snoozedUntil = null,
+  rationale = null,
+  verificationEvidence = null,
   now = new Date(),
 }) {
   const allowed = ALLOWED_WORK_ITEM_TRANSITIONS[fromStatus];
@@ -176,6 +175,19 @@ export function validateWorkItemTransition({
         ok: false,
         status: 400,
         code: 'SNOOZE_UNTIL_MUST_BE_FUTURE',
+      });
+    }
+  }
+
+  // Strict verification: Transitioning to DONE requires verifiable completion evidence
+  if (toStatus === 'DONE') {
+    const evidenceText = String(verificationEvidence || rationale || '').trim();
+    if (evidenceText.length < 5) {
+      return Object.freeze({
+        ok: false,
+        status: 422,
+        code: 'COMPLETION_VERIFICATION_EVIDENCE_REQUIRED',
+        message: 'Marking a WorkItem as DONE requires explicit verification evidence or rationale (minimum 5 chars)',
       });
     }
   }
@@ -309,6 +321,7 @@ export async function createCapturedWorkItem(
     },
   });
 
+  // Outbox event is strictly internal audit in F1A (no external side-effects)
   await tx.outboxEvent.create({
     data: {
       organizationId,
@@ -322,6 +335,7 @@ export async function createCapturedWorkItem(
         status: workItem.status,
         priorityScore: workItem.priorityScore,
         priorityBand: workItem.priorityBand,
+        f1aExternalExecutionBlocked: true,
       },
     },
   });
@@ -344,6 +358,7 @@ export async function transitionWorkItem(
     toStatus,
     snoozedUntil = null,
     rationale = null,
+    verificationEvidence = null,
     now = new Date(),
   }
 ) {
@@ -364,6 +379,8 @@ export async function transitionWorkItem(
     fromStatus: existing.status,
     toStatus,
     snoozedUntil,
+    rationale,
+    verificationEvidence,
     now,
   });
   if (!validation.ok) return validation;
@@ -407,6 +424,12 @@ export async function transitionWorkItem(
       ? 'COMPLETED'
       : 'STATUS_CHANGED';
 
+  const cleanRationale = rationale
+    ? redactSecrets(String(rationale).trim())
+    : toStatus === 'DONE' && verificationEvidence
+    ? redactSecrets(String(verificationEvidence).trim())
+    : priority.priorityReason;
+
   const event = await tx.workItemEvent.create({
     data: {
       organizationId,
@@ -415,15 +438,17 @@ export async function transitionWorkItem(
       eventType,
       fromStatus: existing.status,
       toStatus,
-      rationale: rationale ? redactSecrets(String(rationale).trim()) : priority.priorityReason,
+      rationale: cleanRationale,
       payload: {
         snoozedUntil: effectiveSnoozedUntil ? effectiveSnoozedUntil.toISOString() : null,
         priorityScore: priority.priorityScore,
         priorityBand: priority.priorityBand,
+        verificationEvidence: toStatus === 'DONE' ? redactSecrets(String(verificationEvidence || rationale || '')) : null,
       },
     },
   });
 
+  // Outbox is strictly internal audit; no external action dispatch permitted in F1A
   await tx.outboxEvent.create({
     data: {
       organizationId,
@@ -437,6 +462,7 @@ export async function transitionWorkItem(
         fromStatus: existing.status,
         toStatus,
         priorityScore: priority.priorityScore,
+        f1aExternalExecutionBlocked: true,
       },
     },
   });

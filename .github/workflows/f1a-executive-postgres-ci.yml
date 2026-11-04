@@ -1,0 +1,72 @@
+name: NexosAI F1A PostgreSQL FORCE RLS & Executive CI (Sandbox)
+on:
+  push:
+    branches:
+      - 'feat/nexosai-executive-f1a-pilot-20261104'
+  pull_request:
+    branches:
+      - 'feat/nexosai-executive-f1a-pilot-20261104'
+      - 'test/g3c-strict-release-candidate-20261103'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  executive-f1a-postgres-rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: nexosai_test
+          POSTGRES_PASSWORD: local_ci_only
+          POSTGRES_DB: nexosai_g3c_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nexosai_test -d nexosai_g3c_test"
+          --health-interval 3s --health-timeout 5s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://nexosai_test:local_ci_only@127.0.0.1:5432/nexosai_g3c_test
+      G3C_EPHEMERAL_POSTGRES: 'YES'
+      NEXT_TELEMETRY_DISABLED: '1'
+      AUTH_SECRET: synthetic-ci-only-signing-value-not-valid-for-deployment-2026
+      GOOGLE_CLIENT_ID: synthetic-oauth-id.apps.invalid
+      GOOGLE_CLIENT_SECRET: synthetic-oauth-client-secret
+      NEXOSAI_BOOTSTRAP_ADMIN_EMAIL: bootstrap@example.invalid
+      NEXOSAI_EXECUTIVE_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-fund
+      - run: npx prisma validate
+      - run: npx prisma generate
+      - name: Deploy versioned Prisma migrations to ephemeral PostgreSQL 16
+        run: npx prisma migrate deploy
+      - name: Verify migration history strictly
+        run: npx prisma migrate status
+      - name: Repeat deployment to prove idempotency
+        run: npx prisma migrate deploy
+      - name: Verify zero drift against datamodel
+        run: npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+      - name: F1A Executive Unit Test Suite
+        run: node --test test/executive-f1a-unit.test.mjs
+      - name: F1A PostgreSQL FORCE RLS & Tenant Isolation Test Suite
+        run: node --test test/executive-f1a-postgres-rls.integration.test.mjs
+      - name: Build Next.js production bundle
+        run: npm run build
+      - name: Next.js Unauthenticated Routes Smoke
+        run: node test/n1b-next-http-unauth.smoke.mjs
+      - name: Next.js Missing Secrets Smoke
+        run: node test/n1a-next-http-missing-secrets.smoke.mjs
+      - name: Next.js Authenticated RBAC and Executive Fail-Closed Integration Suite
+        run: node test/n1b-next-http-auth.integration.test.mjs
+      - name: Lint and Typecheck
+        run: |
+          npx eslint src/lib/executive src/app/executive src/app/api/orgs
+          npx tsc --noEmit
+      - name: Production dependencies security audit
+        run: npm audit --omit=dev --audit-level=low

@@ -1,10 +1,16 @@
 // F1A Scoped Read-Only Connectors (GitHub & Vercel) + Persistent Signal Deduplication
+// Requires unforgeable internal provenance symbol to ingest GITHUB/VERCEL signals.
+// External clients are restricted to MANUAL source type only.
 
 import { assertF1AScopeAllowed, EXECUTIVE_QUOTAS } from './executive-gate.mjs';
 import {
   computeSignalDedupHash,
   redactSecrets,
   sanitizeExternalContent,
+  validateStrictIdentifier,
+  validateSafeSourceUrl,
+  validateAndSanitizeMetadata,
+  INTERNAL_CONNECTOR_PROVENANCE_TOKEN,
 } from './executive-security.mjs';
 
 const REPO_FULL_NAME_RX = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -36,16 +42,32 @@ export async function ingestExecutiveSignal(
     sourceUrl = null,
     rawMetadata = null,
     occurredAt = null,
+    actorUserId = null,
+    provenanceToken = null,
     now = new Date(),
   }
 ) {
   const scopeCheck = assertF1AScopeAllowed({ privacyScope, sourceType });
   if (!scopeCheck.ok) return scopeCheck;
 
-  const cleanExternalId = String(externalId || '').trim();
-  if (!cleanExternalId || cleanExternalId.length > 200) {
-    return Object.freeze({ ok: false, status: 400, code: 'INVALID_EXTERNAL_ID' });
+  // Strict Anti-Spoofing: GITHUB, VERCEL, and INTERNAL_AUDIT require unforgeable internal provenance token
+  if (['GITHUB', 'VERCEL', 'INTERNAL_AUDIT'].includes(sourceType)) {
+    if (provenanceToken !== INTERNAL_CONNECTOR_PROVENANCE_TOKEN) {
+      return Object.freeze({
+        ok: false,
+        status: 403,
+        code: 'CONNECTOR_SOURCE_SPOOFING_FORBIDDEN',
+        message: 'External callers cannot forge GITHUB or VERCEL signals directly via manual endpoint',
+      });
+    }
   }
+
+  // Validate strict format of externalId
+  const idCheck = validateStrictIdentifier(externalId, { minLen: 1, maxLen: 160 });
+  if (!idCheck.ok) {
+    return Object.freeze({ ok: false, status: 400, code: 'INVALID_EXTERNAL_ID_FORMAT' });
+  }
+  const cleanExternalId = idCheck.value;
 
   const cleanTitle = sanitizeExternalContent(title, {
     maxChars: 240,
@@ -55,6 +77,7 @@ export async function ingestExecutiveSignal(
     return Object.freeze({ ok: false, status: 400, code: 'INVALID_SIGNAL_TITLE' });
   }
 
+  let requiredUrlPrefix = null;
   if (portfolioItemId && typeof tx?.portfolioItem?.findFirst === 'function') {
     const pItem = await tx.portfolioItem.findFirst({
       where: { id: portfolioItemId, organizationId },
@@ -63,6 +86,7 @@ export async function ingestExecutiveSignal(
         organizationId: true,
         privacyScope: true,
         isProactiveEnabled: true,
+        repoFullName: true,
       },
     });
     if (!pItem || pItem.organizationId !== organizationId) {
@@ -74,7 +98,24 @@ export async function ingestExecutiveSignal(
     if (pItem.isProactiveEnabled === false) {
       return Object.freeze({ ok: false, status: 403, code: 'PORTFOLIO_PROACTIVE_DISABLED' });
     }
+    if (sourceType === 'GITHUB' && pItem.repoFullName) {
+      requiredUrlPrefix = `https://github.com/${pItem.repoFullName}`;
+    }
   }
+
+  // Validate safe HTTPS sourceUrl without credentials, query tokens or hashes
+  const urlCheck = validateSafeSourceUrl(sourceUrl, { requiredOriginPrefix: requiredUrlPrefix });
+  if (!urlCheck.ok) {
+    return urlCheck;
+  }
+  const safeSourceUrl = urlCheck.url;
+
+  // Validate structured metadata
+  const metaCheck = validateAndSanitizeMetadata(rawMetadata);
+  if (!metaCheck.ok) {
+    return metaCheck;
+  }
+  const safeMetadata = metaCheck.metadata;
 
   const dedupHash = computeSignalDedupHash({
     organizationId,
@@ -82,7 +123,7 @@ export async function ingestExecutiveSignal(
     externalId: cleanExternalId,
   });
 
-  // 1. Persistent Deduplication Check (Idempotent return before quota check)
+  // 1. Persistent Deduplication Check
   if (typeof tx?.signal?.findFirst === 'function') {
     const existing = await tx.signal.findFirst({
       where: {
@@ -141,11 +182,6 @@ export async function ingestExecutiveSignal(
     wrapDelimiter: true,
   });
 
-  const safeMetadata =
-    rawMetadata && typeof rawMetadata === 'object'
-      ? JSON.parse(redactSecrets(JSON.stringify(rawMetadata)))
-      : {};
-
   const signal = await tx.signal.create({
     data: {
       organizationId,
@@ -159,9 +195,10 @@ export async function ingestExecutiveSignal(
       untrustedContent: true,
       title: cleanTitle.sanitizedText,
       summary: sanitizedSummary.wrappedContent,
-      sourceUrl: sourceUrl ? redactSecrets(String(sourceUrl).trim()) : null,
+      sourceUrl: safeSourceUrl,
       rawMetadata: {
         ...safeMetadata,
+        actorUserId: actorUserId || null,
         injectionAttemptDetected:
           cleanTitle.injectionAttemptDetected || sanitizedSummary.injectionAttemptDetected,
         truncated: cleanTitle.truncated || sanitizedSummary.truncated,
@@ -339,6 +376,7 @@ export async function pollGitHubRepositorySignalsReadOnly(
           labels,
         },
         occurredAt: item.updated_at || item.created_at || refNow,
+        provenanceToken: INTERNAL_CONNECTOR_PROVENANCE_TOKEN,
         now: refNow,
       });
 
@@ -471,6 +509,7 @@ export async function pollVercelProjectSignalsReadOnly(
           target: dpl.target || 'preview',
         },
         occurredAt: dpl.created ? new Date(dpl.created) : refNow,
+        provenanceToken: INTERNAL_CONNECTOR_PROVENANCE_TOKEN,
         now: refNow,
       });
 

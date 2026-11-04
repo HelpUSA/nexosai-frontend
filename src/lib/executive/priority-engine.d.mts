@@ -39,6 +39,7 @@ export interface WorkItemMutationResult {
   readonly code: string;
   readonly workItem?: ExecutiveWorkItemRecord;
   readonly priority?: PriorityCalculationResult;
+  readonly message?: string;
 }
 
 export function scoreToPriorityBand(score: number): PriorityBand;
@@ -62,6 +63,8 @@ export function validateWorkItemTransition(input: {
   fromStatus: string;
   toStatus: string;
   snoozedUntil?: Date | string | null;
+  rationale?: string | null;
+  verificationEvidence?: string | null;
   now?: Date | string;
 }): {
   readonly ok: boolean;
@@ -99,6 +102,7 @@ export function transitionWorkItem(
     toStatus: string;
     snoozedUntil?: Date | string | null;
     rationale?: string | null;
+    verificationEvidence?: string | null;
     now?: Date | string;
   }
 ): Promise<WorkItemMutationResult>;
